@@ -25,7 +25,7 @@ public:
 								RealType deltaT);
 
 	void computeMomentumEquations(GridFunction* f, GridFunction* g,
-								GridFunctionType* u, GridFunctionType* v,
+								GridFunction* u, GridFunction* v,
 								GridFunctionType& gx, GridFunctionType& gy,
 							    const PointType& h, RealType& deltaT);
 
@@ -35,11 +35,14 @@ public:
 	 */
 	void setBoundaryU(GridFunction& velocity_x);
 
+
 	/*! @brief Function to set the boundary values for v, the velocities in y-direction.
 	 * First implementation: only no-flow boundaries.
 	 *  @param velocity_y is a GridFunction-Object, containing all discretization points.
 	 */
 	void setBoundaryV(GridFunction& velocity_y);
+
+	void setBoundaryV(GridFunction& velocity_y, int rank);
 
 	/*! @brief Function to set the boundary values for the pressure p.
 	 *  @param pressure is a GridFunction-Object, containing all discretization points.

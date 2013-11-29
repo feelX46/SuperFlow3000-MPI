@@ -27,8 +27,8 @@ void Computation::computeNewVelocities(GridFunction* u, GridFunction* v,
                                 GridFunctionType& p, const PointType& h,
                                 RealType deltaT){
 	//compute u
-	MultiIndexType bb (1,1);
-	MultiIndexType ee (u->griddimension[0]-3,u->griddimension[1]-2);
+	MultiIndexType bb = u->bottomleft;
+	MultiIndexType ee(u->upperright[0],u->upperright[1]);
 	u->SetGridFunction(bb,ee,1,f);
 	RealType factor = -deltaT/h[0];
 	MultiIndexType offset (1,0);
@@ -50,7 +50,7 @@ void Computation::computeNewVelocities(GridFunction* u, GridFunction* v,
 
 
 void Computation::computeMomentumEquations(GridFunction* f, GridFunction* g,
-                                GridFunctionType* u, GridFunctionType* v,
+                                GridFunction* u, GridFunction* v,
                                 GridFunctionType& gx, GridFunctionType& gy,
                                 const PointType& h, RealType& deltaT) {
 	MultiIndexType dim = f->griddimension;
@@ -59,29 +59,31 @@ void Computation::computeMomentumEquations(GridFunction* f, GridFunction* g,
 	GridFunction derivative (dim);
 	RealType factor;
 	//  --  compute F  --
-	MultiIndexType bread (0,0);
-	MultiIndexType eread (dim[0]-2,dim[1]-1);
-	MultiIndexType bwrite (1,1);
-	MultiIndexType ewrite (dim[0]-3,dim[1]-2);
+	MultiIndexType bread (u->bottomleft[0]-1,u->bottomleft[1]-1);
+	MultiIndexType eread (u->upperright[0]+1,u->upperright[1]+1);
+	MultiIndexType bwrite (u->bottomleft[0],u->bottomleft[1]);
+	MultiIndexType ewrite (u->upperright[0],u->upperright[1]);
 	derivative.SetGridFunction(bread,eread,0);  //set to zero
 	//add u
-	f->SetGridFunction(bwrite,ewrite,1,*u);
+
+	GridFunctionType tmpu = u->GetGridFunction();
+	f->SetGridFunction(bwrite,ewrite,1,tmpu);
 	//add derivatives:
-	sten.ApplyFxxStencilOperator(bread,eread,bwrite,ewrite,*u,derivative);
+	sten.ApplyFxxStencilOperator(bread,eread,bwrite,ewrite,u->GetGridFunction(),derivative);
 	factor = deltaT/param.RE;
 	GridFunctionType bla = derivative.GetGridFunction(); //ToDo -> fragen wieso?
 	f->AddToGridFunction(bwrite,ewrite,factor,bla);
 
-	sten.ApplyFyyStencilOperator(bread,eread,bwrite,ewrite,*u,derivative);
+	sten.ApplyFyyStencilOperator(bread,eread,bwrite,ewrite,u->GetGridFunction(),derivative);
 	bla = derivative.GetGridFunction();
 	f->AddToGridFunction(bwrite,ewrite,factor,bla);
 
 	factor=-deltaT;
-	sten.ApplyUSqxStencilOperator(bread,eread,bwrite,ewrite,*u,derivative,param.alpha);
+	sten.ApplyUSqxStencilOperator(bread,eread,bwrite,ewrite,(u->GetGridFunction()),derivative,param.alpha);
 	bla = derivative.GetGridFunction();
 	f->AddToGridFunction(bwrite,ewrite,factor,bla);
 
-	sten.ApplyUVyStencilOperator(bread,eread,bwrite,ewrite,*u,*v,derivative,param.alpha);
+	sten.ApplyUVyStencilOperator(bread,eread,bwrite,ewrite,(u->GetGridFunction()),(v->GetGridFunction()),derivative,param.alpha);
 	bla = derivative.GetGridFunction();
 	f->AddToGridFunction(bwrite,ewrite,factor,bla);
 
@@ -92,23 +94,24 @@ void Computation::computeMomentumEquations(GridFunction* f, GridFunction* g,
 	eread[0] =dim[0]-1; eread[1] =dim[1]-2;
 	ewrite[0]=dim[0]-2; ewrite[1]=dim[1]-3;
 	//add v
-	g->SetGridFunction(bwrite,ewrite,1,*v);
+	GridFunctionType tmpv = v->GetGridFunction();
+	g->SetGridFunction(bwrite,ewrite,1,tmpv);
 	//add derivatives:
-	sten.ApplyFxxStencilOperator(bread,eread,bwrite,ewrite,*v,derivative);
+	sten.ApplyFxxStencilOperator(bread,eread,bwrite,ewrite,v->GetGridFunction(),derivative);
 	factor = deltaT/param.RE;
     bla = derivative.GetGridFunction(); //ToDo -> fragen wieso?
 	g->AddToGridFunction(bwrite,ewrite,factor,bla);
 
-	sten.ApplyFyyStencilOperator(bread,eread,bwrite,ewrite,*v,derivative);
+	sten.ApplyFyyStencilOperator(bread,eread,bwrite,ewrite,v->GetGridFunction(),derivative);
 	bla = derivative.GetGridFunction();
 	g->AddToGridFunction(bwrite,ewrite,factor,bla);
 
 	factor=-deltaT;
-	sten.ApplyVSqyStencilOperator(bread,eread,bwrite,ewrite,*v,derivative,param.alpha);
+	sten.ApplyVSqyStencilOperator(bread,eread,bwrite,ewrite,v->GetGridFunction(),derivative,param.alpha);
 	bla = derivative.GetGridFunction();
 	g->AddToGridFunction(bwrite,ewrite,factor,bla);
 
-	sten.ApplyUVxStencilOperator(bread,eread,bwrite,ewrite,*u,*v,derivative,param.alpha);
+	sten.ApplyUVxStencilOperator(bread,eread,bwrite,ewrite,u->GetGridFunction(),v->GetGridFunction(),derivative,param.alpha);
 	bla = derivative.GetGridFunction();
 	g->AddToGridFunction(bwrite,ewrite,factor,bla);
 
@@ -117,94 +120,152 @@ void Computation::computeMomentumEquations(GridFunction* f, GridFunction* g,
 }
 void Computation::setBoundaryU(GridFunction& u){
     RealType value = 0;
+    MultiIndexType bb;
+    MultiIndexType ee;
+    MultiIndexType offset;
+
+    if(u.globalboundary[3]){
     // left -> 0
-    MultiIndexType bb(0,1);
-    MultiIndexType ee(0,u.griddimension[1]-2);
-    u.SetGridFunction(bb,ee,value);
+    	bb[0] = 1; bb[1] = 2;
+    	ee[0] = 1; ee[1] = u.griddimension[1]-2;
+    	u.SetGridFunction(bb,ee,value);
+    }
     //right -> 0
-    bb[0]= u.griddimension[0]-2; bb[1] = 1;
-    ee[0]= u.griddimension[0]-2; ee[1] = u.griddimension[1]-2;
-    u.SetGridFunction(bb,ee,value);
+    if(u.globalboundary[1]){
+    	bb[0]= u.griddimension[0]-2; bb[1] = 2;
+    	ee[0]= u.griddimension[0]-2; ee[1] = u.griddimension[1]-2;
+    	u.SetGridFunction(bb,ee,value);
+    }
 
     //bottom
-    bb[0]= 1; bb[1] = 0;
-    ee[0]= u.griddimension[0]-2; ee[1] = 0;
-    MultiIndexType offset(0,1);
-    u.SetGridFunction(bb,ee,-1,offset);
-    //ToDo: testen
-    //top
-    bb[0]= 1; bb[1] = u.griddimension[1]-1;
-    ee[0]= u.griddimension[0]-2; ee[1] = u.griddimension[1]-1;
-    offset[1]=-1;
-    u.SetGridFunction(bb,ee,-1,offset);
-}
-void Computation::setBoundaryV(GridFunction& v){
-    // left
-    MultiIndexType bb (0,1);
-    MultiIndexType ee (0,v.griddimension[1]-2);
-    MultiIndexType offset(1,0);
-    v.SetGridFunction(bb,ee,-1,offset);
+    if(u.globalboundary[0]){
+    	bb[0]= 2; bb[1] = 1;
+    	ee[0]= u.griddimension[0]-2; ee[1] = 1;
+    	offset[0] = 0;
+    	offset[1] = 1;
+    	u.SetGridFunction(bb,ee,-1,offset);
+    }
 
-    RealType value = 0;
+    //top
+    if(u.globalboundary[2]) {
+    	bb[0]= 2; bb[1] = u.griddimension[1]-1;
+    	ee[0]= u.griddimension[0]-2; ee[1] = u.griddimension[1]-1;
+    	offset[0] = 0;
+    	offset[1] = -1;
+    	u.SetGridFunction(bb,ee,-1,offset);
+    }
+}
+
+
+void Computation::setBoundaryV(GridFunction& v){
+	MultiIndexType bb;
+	MultiIndexType ee;
+	MultiIndexType offset;
+	RealType value = 0;
+
+	// left
+	if(v.globalboundary[3]) {
+		bb[0] = 1; bb[1] = 2;
+		ee[0] = 1; ee[1] = v.griddimension[1]-2;
+		offset[0] = 1;
+		offset[1] = 0;
+		v.SetGridFunction(bb,ee,-1,offset);
+	}
+
     //bottom ->0
-    bb[0] = 1; bb[1] = 0;
-    ee[0] = v.griddimension[0]-2; ee[1] = 0;
-    v.SetGridFunction(bb,ee,value);
+    if(v.globalboundary[0]) {
+    	bb[0] = 2; bb[1] = 1;
+    	ee[0] = v.griddimension[0]-2; ee[1] = 1;
+    	v.SetGridFunction(bb,ee,value);
+    }
     //top ->0
-    bb[0] = 1; bb[1] = v.griddimension[1]-2;
-    ee[0] = v.griddimension[0]-2; ee[1] = v.griddimension[1]-2;
-    v.SetGridFunction(bb,ee,value);
+    if(v.globalboundary[2]) {
+    	bb[0] = 2; bb[1] = v.griddimension[1]-2;
+    	ee[0] = v.griddimension[0]-2; ee[1] = v.griddimension[1]-2;
+    	v.SetGridFunction(bb,ee,value);
+    }
 
     //right
-    bb[0] = v.griddimension[0]-1; bb[1] = 1;
-    ee[0] = v.griddimension[0]-1; ee[1] = v.griddimension[1]-2;
-    offset[0]=-1;
-    v.SetGridFunction(bb,ee,-1,offset);
+    if(v.globalboundary[1]) {
+    	bb[0] = v.griddimension[0]-1; bb[1] = 2;
+    	ee[0] = v.griddimension[0]-1; ee[1] = v.griddimension[1]-2;
+    	offset[0]=-1;
+    	offset[1] = 0;
+    	v.SetGridFunction(bb,ee,-1,offset);
+    }
 }
 
 void Computation::setBoundaryP(GridFunction& p){
+	MultiIndexType bb;
+	MultiIndexType ee;
+	MultiIndexType offset;
+
 	// left
-    MultiIndexType bb (0,1);
-    MultiIndexType ee (0,p.griddimension[1]-2);
-    MultiIndexType offset(1,0);
-    p.SetGridFunction(bb,ee,1,offset);
+	if(p.globalboundary[3]) {
+		bb[0] = 1; bb[1] = 2;
+		ee[0] = 1; ee[1] = p.griddimension[1]-2;
+		offset[0] = 1;
+		offset[1] = 0;
+		p.SetGridFunction(bb,ee,1,offset);
+	}
     //right
-    bb[0] = p.griddimension[0]-1; bb[1] = 1;
-    ee[0] = p.griddimension[0]-1; ee[1] = p.griddimension[1]-2;
-    offset[0]=-1;
-    p.SetGridFunction(bb,ee,1,offset);
+	if(p.globalboundary[1]) {
+		bb[0] = p.griddimension[0]-1; bb[1] = 2;
+		ee[0] = p.griddimension[0]-1; ee[1] = p.griddimension[1]-2;
+		offset[0]=-1;
+		offset[1] = 0;
+		p.SetGridFunction(bb,ee,1,offset);
+	}
     //bottom
-    bb[0] = 1; bb[1] = 0;
-    ee[0] = p.griddimension[0]-2; ee[1] = 0;
-    offset[0]=0; offset[1]=1;
-    p.SetGridFunction(bb,ee,1,offset);
+	if(p.globalboundary[0]) {
+		bb[0] = 2; bb[1] = 1;
+		ee[0] = p.griddimension[0]-2; ee[1] = 1;
+		offset[0]=0; offset[1]=1;
+		p.SetGridFunction(bb,ee,1,offset);
+	}
     //top
-    bb[0] = 1; bb[1] = p.griddimension[1]-1;
-    ee[0] = p.griddimension[0]-2; ee[1] = p.griddimension[1]-1;
-    offset[0]=0; offset[1]=-1;
-    p.SetGridFunction(bb,ee,1,offset);
+	if(p.globalboundary[2]) {
+		bb[0] = 2; bb[1] = p.griddimension[1]-1;
+		ee[0] = p.griddimension[0]-2; ee[1] = p.griddimension[1]-1;
+		offset[0]=0; offset[1]=-1;
+		p.SetGridFunction(bb,ee,1,offset);
+	}
 }
 //ToDo: referenz reingeben?
 void Computation::setBoundaryF(GridFunction& f, GridFunctionType& u){
+	MultiIndexType bb;
+	MultiIndexType ee;
+
 	// left
-	MultiIndexType bb (0,1);
-	MultiIndexType ee (0,f.griddimension[1]-2);
-	f.SetGridFunction(bb,ee,1,u);
+	if(f.globalboundary[2]) {
+		bb[0] = 1; bb[1] = 2;
+		ee[0] = 1; ee[1] = f.griddimension[1]-2;
+		f.SetGridFunction(bb,ee,1,u);
+	}
     //right
-    bb[0] = f.griddimension[0]-2; bb[1] = 1;
-    ee[0] = f.griddimension[0]-2; ee[1] = f.griddimension[1]-2;
-    f.SetGridFunction(bb,ee,1,u);
+	if(f.globalboundary[1]) {
+		bb[0] = f.griddimension[0]-2; bb[1] = 2;
+		ee[0] = f.griddimension[0]-2; ee[1] = f.griddimension[1]-2;
+		f.SetGridFunction(bb,ee,1,u);
+	}
 }
 
 void Computation::setBoundaryG(GridFunction& g, GridFunctionType& v){
-    //bottom
-	MultiIndexType bb (1,0);
-	MultiIndexType ee (g.griddimension[0]-2,0);
-    g.SetGridFunction(bb,ee,1,v);
+	MultiIndexType bb;
+	MultiIndexType ee;
+
+	//bottom
+	if(g.globalboundary[0]) {
+		bb[0] = 2; bb[1] = 1;
+		ee[0] = g.griddimension[0]-2; ee[1] = 0;
+		g.SetGridFunction(bb,ee,1,v);
+	}
     //top
-    bb[0] = 1; bb[1] = g.griddimension[1]-2;
-    ee[0] = g.griddimension[0]-2; ee[1] = g.griddimension[1]-2;
-    g.SetGridFunction(bb,ee,1,v);
+	if(g.globalboundary[2]) {
+		bb[0] = 2; bb[1] = g.griddimension[1]-2;
+		ee[0] = g.griddimension[0]-2; ee[1] = g.griddimension[1]-2;
+		g.SetGridFunction(bb,ee,1,v);
+	}
 }
 
 void Computation::computeRighthandSide(GridFunction* rhs,

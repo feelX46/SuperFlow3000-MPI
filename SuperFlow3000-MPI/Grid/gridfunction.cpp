@@ -9,6 +9,7 @@
 #include <iostream>
 //1
 GridFunction::GridFunction(int DimX, int DimY){
+	 this->InitializeGlobalBoundary();
 	 gridfunction = new RealType*[DimX];
 	 for (IndexType i = 0; i < DimX; i++){
 		 gridfunction[i] = new RealType [DimY-1];
@@ -24,6 +25,7 @@ GridFunction::GridFunction(int DimX, int DimY){
 
 //1.1
 GridFunction::GridFunction(int DimX, int DimY, RealType value){
+	 this->InitializeGlobalBoundary();
 	 gridfunction = new RealType*[DimX];
 	 for (IndexType i = 0; i < DimX; i++){
 		 gridfunction[i] = new RealType [DimY-1];
@@ -37,6 +39,7 @@ GridFunction::GridFunction(int DimX, int DimY, RealType value){
 
 //2
 GridFunction::GridFunction(const MultiIndexType griddimension_input) : griddimension(griddimension_input){
+	this->InitializeGlobalBoundary();
 	 gridfunction= new RealType*[griddimension[0]];
 	 for (IndexType i = 0; i < griddimension[0]; i++){
 		 gridfunction[i] = new RealType[griddimension[1]];
@@ -45,7 +48,8 @@ GridFunction::GridFunction(const MultiIndexType griddimension_input) : griddimen
 
 //2.1
 GridFunction::GridFunction(const MultiIndexType griddimension_input,RealType value) : griddimension(griddimension_input){
-	 gridfunction= new RealType*[griddimension[0]];
+	this->InitializeGlobalBoundary();
+	gridfunction= new RealType*[griddimension[0]];
 	 for (IndexType i = 0; i < griddimension[0]; i++){
 		 gridfunction[i] = new RealType [griddimension[1]];
 	 }
@@ -222,6 +226,43 @@ void GridFunction::PlotGrid(){
 
 }
 
+void GridFunction::InitializeGlobalBoundaryPosition(int rank, int mpiSizeH, int mpiSizeV, char name){
+	if (rank < mpiSizeH){
+		globalboundary[0] = true;
+		bottomleft[1]=2;
+		upperleft[1] = 2;
+	}
+	if (rank >= (mpiSizeH*mpiSizeV)-mpiSizeH){
+		globalboundary[2] = true;
+	}
+	if ((rank+1) % mpiSizeH) {
+		globalboundary[1] = true;
+	}
+	if (rank%mpiSizeH) {
+		globalboundary[3] = true;
+		bottomleft[0] = 2;
+		upperleft[0] = 2;
+	}
+}
+
+void GridFunction::InitializeGlobalBoundary() {
+	globalboundary[0] = false;
+	globalboundary[1] = false;
+	globalboundary[2] = false;
+	globalboundary[3] = false;
+
+	bottomleft[0] = 1;
+	bottomleft[1] = 1;
+
+	bottomright[0] = griddimension[0] - 2;
+	bottomright[1] = 1;
+
+	upperright[0] = griddimension[0] - 2;
+	upperright[1] = griddimension[1] - 2;
+
+	upperleft[0] = 1;
+	upperleft[1] = griddimension[1] - 2;
+}
 bool GridFunction::CheckInGrid(const MultiIndexType& begin, const MultiIndexType& end){
 	bool error = false;
 	if (begin[0]>end[0]){

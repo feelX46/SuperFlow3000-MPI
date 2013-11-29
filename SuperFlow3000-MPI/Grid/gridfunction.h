@@ -103,6 +103,17 @@ public:
 	//! dimension of the grid
 	MultiIndexType	griddimension;
 
+	bool globalboundary[4];
+
+	MultiIndexType bottomleft;
+	MultiIndexType bottomright;
+	MultiIndexType upperright;
+	MultiIndexType upperleft;
+
+	void InitializeGlobalBoundaryPosition(int rank, int mpiSizeH, int mpiSizeV, char name);
+
+	void InitializeGlobalBoundary();
+
 	bool CheckInGrid(const MultiIndexType& begin, const MultiIndexType& end);
 };
 

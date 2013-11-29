@@ -12,9 +12,21 @@
 #include "Grid/gridfunction.h"
 #include "Computation/computation.h"
 #include "Solver/solver.h"
+#include "mpi.h"
 
-int main(){
+int main(int argc, char *argv[]){
 	std::cout << "#### SuperFlow3000 ####\n";
+
+	MPI_Init(&argc, &argv);
+
+	int mpiRank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &mpiRank);
+	int mpiSize;
+	MPI_Comm_size(MPI_COMM_WORLD, &mpiSize);
+
+
+
+
 	char InputFileName[] = "inputvals.bin";
 	char OutputFolderName[] = "output";  // output folder! -> be careful, if folder is not there, no data are saved
 	// load simparam
@@ -23,48 +35,87 @@ int main(){
 	Computation pc (simparam);
 	Solver sol (simparam);
 	// initialize grids
-    MultiIndexType griddimension (simparam.iMax+2,simparam.jMax+2);
+	// different sizes for MPI
+
+	// willkuerliche gewaehlt - vertikal immer nur zwei gebiete
+	IndexType mpiSizeH = mpiSize/2;
+	IndexType mpiSizeV = 2;
+
+
+	//Grids sollen gleiche groesse haben!!
+	IndexType il=2;
+	IndexType ir=il+(simparam.iMax)/mpiSizeH-1;
+	IndexType jb=2;
+	IndexType jt=jb+(simparam.jMax)/mpiSizeV-1;
+
+
+	MultiIndexType griddimension ((ir-il+4),(jt-jb+4));
     GridFunction p(griddimension,simparam.PI);
+    p.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'p');
+
     GridFunction rhs(griddimension);
+    rhs.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'r');
+
     GridFunction v(griddimension,simparam.VI);
+    v.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'v');
+
     GridFunction g(griddimension);
+    g.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'g');
+
     GridFunction u(griddimension,simparam.UI);
+    u.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'u');
+
     GridFunction f(griddimension);
+    f.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'f');
 
-
+    // Durch ir, il, jb und jt abgedeckt
+    /*
     MultiIndexType bb(1,1); //lower left
     MultiIndexType ee(simparam.iMax,simparam.jMax); //upper right
+    */
 
 	const PointType h(simparam.xLength/simparam.iMax , simparam.yLength/simparam.jMax);
 
 	RealType deltaT = simparam.deltaT;
 	RealType t = 0;
 	int step = 0;
+
+	// so gross wie u
 	GridFunction gx(griddimension,simparam.GX);
+
+	// so gross wie v
 	GridFunction gy(griddimension,simparam.GY);
 
 	//---- for Boundary condition ----
 	//for driven cavity
-	MultiIndexType upperleft (1,                 griddimension[1]-1);
-	MultiIndexType upperright(griddimension[0]-2,griddimension[1]-1);
+
+
+	// steht jetzt in der gridfunction selber
+	//MultiIndexType upperleft (1,                 griddimension[1]-1);
+	//MultiIndexType upperright(griddimension[0]-2,griddimension[1]-1);
 	MultiIndexType offset (0,-1);
-	//
-	MultiIndexType linksunten (0,1);
-	MultiIndexType linksoben  (0,griddimension[1]-2);
-	MultiIndexType rechtsunten (griddimension[0]-2,1);
-	MultiIndexType rechtsoben  (griddimension[0]-2,griddimension[1]-2);
+	//evtl. zum testen noetig (einfach durchfliessen)
+	//MultiIndexType linksunten (0,1);
+	//MultiIndexType linksoben  (0,griddimension[1]-2);
+	//MultiIndexType rechtsunten (griddimension[0]-2,1);
+	//MultiIndexType rechtsoben  (griddimension[0]-2,griddimension[1]-2);
 	// write first output data
+
+	//wird hier ein vtk file geschrieben, ohne dass randwerte in matritzen geschrieben wurden?
 	Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step);
 	// start time loop
 	while (t <= simparam.tEnd){
 
 		// compute deltaT
-		deltaT = pc.computeTimestep(u.MaxValueGridFunction(bb,ee),v.MaxValueGridFunction(bb,ee),h);
+		deltaT = 0.1;
+		//deltaT = pc.computeTimestep(u.MaxValueGridFunction(bb,ee),v.MaxValueGridFunction(bb,ee),h);
 		// set boundary
 		pc.setBoundaryU(u); //First implementation: only no-flow boundaries-> everything is zero!
 		pc.setBoundaryV(v);
 		// driven cavity:
-		 u.SetGridFunction(upperleft,upperright,-1.0,offset,2.0);
+		if (u.globalboundary[2]){
+			u.SetGridFunction(u.upperleft,u.upperright,-1.0,offset,2.0);
+		}
 		//einfach durchfliesen
 		//u.SetGridFunction(linksunten,linksoben,1);
 		//u.SetGridFunction(rechtsunten,rechtsoben,1);
@@ -79,7 +130,7 @@ int main(){
 		GridFunctionType blgy = gy.GetGridFunction();
 		GridFunctionType blu  = u.GetGridFunction();
 		GridFunctionType blv  = v.GetGridFunction();
-		pc.computeMomentumEquations(&f,&g,&blu,&blv,blgx,blgy,h,deltaT);
+		pc.computeMomentumEquations(&f,&g,&u,&v,blgx,blgy,h,deltaT);
 		pc.setBoundaryF(f,blu);
 		pc.setBoundaryG(g,blv);
 		// set right side of pressure equation
