@@ -47,8 +47,8 @@ GridFunction::GridFunction(const MultiIndexType griddimension_input) : griddimen
 }
 
 //2.1
-GridFunction::GridFunction(const MultiIndexType griddimension_input,RealType value) : griddimension(griddimension_input){
-	this->InitializeGlobalBoundary();
+GridFunction::GridFunction(const MultiIndexType griddimension_input,RealType value, char indicator) : griddimension(griddimension_input){
+	this->InitializeGlobalBoundary(indicator);
 	gridfunction= new RealType*[griddimension[0]];
 	 for (IndexType i = 0; i < griddimension[0]; i++){
 		 gridfunction[i] = new RealType [griddimension[1]];
@@ -229,7 +229,7 @@ void GridFunction::PlotGrid(){
 void GridFunction::InitializeGlobalBoundaryPosition(int rank, int mpiSizeH, int mpiSizeV, char name){
 	if (rank < mpiSizeH){
 		globalboundary[0] = true;
-		bottomleft[1]=2;
+		bottomleft[1]= 2;
 		upperleft[1] = 2;
 	}
 	if (rank >= (mpiSizeH*mpiSizeV)-mpiSizeH){
@@ -245,11 +245,37 @@ void GridFunction::InitializeGlobalBoundaryPosition(int rank, int mpiSizeH, int 
 	}
 }
 
-void GridFunction::InitializeGlobalBoundary() {
+void GridFunction::InitializeGlobalBoundary(char indicator) {
+	// unten 0, dann gegen den Uhrzeigersinn
 	globalboundary[0] = false;
 	globalboundary[1] = false;
 	globalboundary[2] = false;
 	globalboundary[3] = false;
+
+	switch (indicator)
+	{
+	case 'r':
+	case 'p': beginread[0] = 1; beginread[1] = 1;
+			   endread[0] = griddimension[0]-1; endread[1] = griddimension[1]-1;
+			   beginwrite[0] = 2; beginwrite[1] = 2;
+			   endwrite[0] = griddimension[0]-2; endwrite[1] = griddimension[1]-2;
+			   break;
+	case 'u':
+	case 'f' : beginread[0] = 0; beginread[1] = 1;
+	   	   	   	endread[0] = griddimension[0]-1; endread[1] = griddimension[1]-1;
+	   	   	   	beginwrite[0] = 1; beginwrite[1] = 2;
+	   	   	   	endwrite[0] = griddimension[0]-2; endwrite[1] = griddimension[1]-2;
+	   	   	   	break;
+
+	case 'v':
+	case 'g' : beginread[0] = 1; beginread[1] = 0;
+	   	   	   	endread[0] = griddimension[0]-1; endread[1] = griddimension[1]-1;
+	            beginwrite[0] = 2; beginwrite[1] = 1;
+	            endwrite[0] = griddimension[0]-2; endwrite[1] = griddimension[1]-2;
+	            break;
+
+	}
+
 
 	bottomleft[0] = 1;
 	bottomleft[1] = 1;

@@ -35,7 +35,7 @@ public:
 		   * @param griddimension_input grid dimension
 		   * @param value inital value
 		   */
-	GridFunction(const MultiIndexType griddimension_input, RealType value);
+	GridFunction(const MultiIndexType griddimension_input, RealType value, char indicator);
 
 	//! Destructor (3)
 	~GridFunction();
@@ -110,9 +110,14 @@ public:
 	MultiIndexType upperright;
 	MultiIndexType upperleft;
 
+	MultiIndexType beginread;
+	MultiIndexType endread;
+	MultiIndexType beginwrite;
+	MultiIndexType endwrite;
+
 	void InitializeGlobalBoundaryPosition(int rank, int mpiSizeH, int mpiSizeV, char name);
 
-	void InitializeGlobalBoundary();
+	void InitializeGlobalBoundary(char indicator);
 
 	bool CheckInGrid(const MultiIndexType& begin, const MultiIndexType& end);
 };
