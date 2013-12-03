@@ -56,13 +56,19 @@ void Computation::computeMomentumEquations(GridFunction* f, GridFunction* g,
 	MultiIndexType dim = f->griddimension;
 
 	Stencil sten(3,h);
-	GridFunction derivative (dim);
+	//ToDo welchen character uebergeben?? wahrscheinlich egal
+	GridFunction derivative (dim,'p');
 	RealType factor;
 	//  --  compute F  --
-	MultiIndexType bread (u->bottomleft[0]-1,u->bottomleft[1]-1);
-	MultiIndexType eread (u->upperright[0]+1,u->upperright[1]+1);
-	MultiIndexType bwrite (u->bottomleft[0],u->bottomleft[1]);
-	MultiIndexType ewrite (u->upperright[0],u->upperright[1]);
+	MultiIndexType bread;
+	bread = f-> beginread;
+	MultiIndexType eread;
+	eread = f-> endread;
+	MultiIndexType bwrite;
+	bwrite = f-> beginwrite;
+	MultiIndexType ewrite;
+	ewrite = f-> endwrite;
+
 	derivative.SetGridFunction(bread,eread,0);  //set to zero
 	//add u
 
@@ -90,9 +96,13 @@ void Computation::computeMomentumEquations(GridFunction* f, GridFunction* g,
 	f->AddToGridFunction(bwrite,ewrite,-factor,gx);
 
 	//  --  compute G  --
+	bread = g->beginread;
+	eread = g->endread;
+	bwrite = g->beginwrite;
+	ewrite = g->endwrite;
+
 	derivative.SetGridFunction(bread,eread,0);  //set derivative to zero
-	eread[0] =dim[0]-1; eread[1] =dim[1]-2;
-	ewrite[0]=dim[0]-2; ewrite[1]=dim[1]-3;
+
 	//add v
 	GridFunctionType tmpv = v->GetGridFunction();
 	g->SetGridFunction(bwrite,ewrite,1,tmpv);
@@ -139,7 +149,7 @@ void Computation::setBoundaryU(GridFunction& u){
 
     //bottom
     if(u.globalboundary[0]){
-    	bb[0]= 2; bb[1] = 1;
+    	bb[0]= 1; bb[1] = 1;
     	ee[0]= u.griddimension[0]-2; ee[1] = 1;
     	offset[0] = 0;
     	offset[1] = 1;
@@ -148,7 +158,7 @@ void Computation::setBoundaryU(GridFunction& u){
 
     //top
     if(u.globalboundary[2]) {
-    	bb[0]= 2; bb[1] = u.griddimension[1]-1;
+    	bb[0]= 1; bb[1] = u.griddimension[1]-1;
     	ee[0]= u.griddimension[0]-2; ee[1] = u.griddimension[1]-1;
     	offset[0] = 0;
     	offset[1] = -1;
@@ -165,7 +175,7 @@ void Computation::setBoundaryV(GridFunction& v){
 
 	// left
 	if(v.globalboundary[3]) {
-		bb[0] = 1; bb[1] = 2;
+		bb[0] = 1; bb[1] = 1;
 		ee[0] = 1; ee[1] = v.griddimension[1]-2;
 		offset[0] = 1;
 		offset[1] = 0;
@@ -187,7 +197,7 @@ void Computation::setBoundaryV(GridFunction& v){
 
     //right
     if(v.globalboundary[1]) {
-    	bb[0] = v.griddimension[0]-1; bb[1] = 2;
+    	bb[0] = v.griddimension[0]-1; bb[1] = 1;
     	ee[0] = v.griddimension[0]-1; ee[1] = v.griddimension[1]-2;
     	offset[0]=-1;
     	offset[1] = 0;
@@ -231,7 +241,7 @@ void Computation::setBoundaryP(GridFunction& p){
 		p.SetGridFunction(bb,ee,1,offset);
 	}
 }
-//ToDo: referenz reingeben?
+
 void Computation::setBoundaryF(GridFunction& f, GridFunctionType& u){
 	MultiIndexType bb;
 	MultiIndexType ee;
@@ -257,7 +267,7 @@ void Computation::setBoundaryG(GridFunction& g, GridFunctionType& v){
 	//bottom
 	if(g.globalboundary[0]) {
 		bb[0] = 2; bb[1] = 1;
-		ee[0] = g.griddimension[0]-2; ee[1] = 0;
+		ee[0] = g.griddimension[0]-2; ee[1] = 1;
 		g.SetGridFunction(bb,ee,1,v);
 	}
     //top
@@ -274,21 +284,24 @@ void Computation::computeRighthandSide(GridFunction* rhs,
     		const PointType& delta,
     		RealType deltaT){
 
-	MultiIndexType bb (0,0);
-	MultiIndexType ee (rhs->griddimension[0]-1,rhs->griddimension[1]-1);
-	rhs->SetGridFunction(bb,ee,0);
-	bb[0]= 1; bb[1]= 1;
-	ee[0]= rhs->griddimension[0]-2; ee[1]= rhs->griddimension[1]-2;
+	// alle Werte mit 0 initialisieren
+	MultiIndexType bwrite (0,0);
+	MultiIndexType ewrite (rhs->griddimension[0]-1,rhs->griddimension[1]-1);
+	rhs->SetGridFunction(bwrite,ewrite,0);
+
+	bwrite = rhs->beginwrite;
+	ewrite = rhs->endwrite;
+
 	RealType factor = 1/(deltaT*delta[0]);
 	MultiIndexType offset (0,0);
-	rhs->AddToGridFunction(bb,ee,factor,f,offset);
+	rhs->AddToGridFunction(bwrite,ewrite,factor,f,offset);
 	offset[0]=-1;
-	rhs->AddToGridFunction(bb,ee,-factor,f,offset);
+	rhs->AddToGridFunction(bwrite,ewrite,-factor,f,offset);
 	factor = (1/(deltaT*delta[1]));
 	offset[0]=0;
-	rhs->AddToGridFunction(bb,ee,factor,g,offset);
+	rhs->AddToGridFunction(bwrite,ewrite,factor,g,offset);
 	offset[1]=-1;
-	rhs->AddToGridFunction(bb,ee,-factor,g,offset);
+	rhs->AddToGridFunction(bwrite,ewrite,-factor,g,offset);
 }
 
 

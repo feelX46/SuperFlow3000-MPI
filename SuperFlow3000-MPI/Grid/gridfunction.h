@@ -17,19 +17,19 @@ public:
 	   * @param DimX Dimension in X-Direction
 	   * @param DimY Dimension in Y-Direction
 	   */
-	GridFunction(int DimX, int DimY);
+	GridFunction(int DimX, int DimY, char indicator);
 
 	/*! Construktor (1.1)
 		   * @param DimX Dimension in X-Direction
 		   * @param DimY Dimension in Y-Direction
 		   * @param value initial value
 		   */
-	GridFunction(int DimX, int DimY, RealType value);
+	GridFunction(int DimX, int DimY, RealType value, char indicator);
 
 	/*! Construktor (2)
 		   * @param griddimension_input grid dimension
 		   */
-	GridFunction(const MultiIndexType griddimension_input);
+	GridFunction(const MultiIndexType griddimension_input, char indicator);
 
 	/*! Construktor (2.1)
 		   * @param griddimension_input grid dimension
@@ -89,6 +89,7 @@ public:
 	void AddToGridFunction (const MultiIndexType& begin, const MultiIndexType& end,RealType factor,
 			GridFunctionType& sourcegridfunction, MultiIndexType& offset);
 
+	//RealType* GetSlice(MultiIndexType bb, MultiIndexType ee);
 
 
 	//! find maximum (12)
@@ -115,7 +116,7 @@ public:
 	MultiIndexType beginwrite;
 	MultiIndexType endwrite;
 
-	void InitializeGlobalBoundaryPosition(int rank, int mpiSizeH, int mpiSizeV, char name);
+	void InitializeGlobalBoundaryPosition(int rank, int mpiSizeH, int mpiSizeV, char indicator);
 
 	void InitializeGlobalBoundary(char indicator);
 

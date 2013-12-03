@@ -31,28 +31,33 @@ RealType Solver::computeResidual(GridFunction& sourcegridfunction,
      */
 
     MultiIndexType dim = sourcegridfunction.GetGridDimension();
-    MultiIndexType bread  (0,0);
-    MultiIndexType eread  (dim[0]-1,dim[1]-1);
-    MultiIndexType bwrite (1,1);
-    MultiIndexType ewrite (dim[0]-2,dim[1]-2);
+    MultiIndexType bread;
+    bread = sourcegridfunction.beginread;
+    MultiIndexType eread;
+    eread = sourcegridfunction.endread;
+    MultiIndexType bwrite;
+    bwrite = sourcegridfunction.beginwrite;
+    MultiIndexType ewrite;
+    ewrite = sourcegridfunction.endwrite;
 
     //Compute the needed derivations for the whole (inner?) area
     Stencil stencil(3,h); 					// bzw. Kann man einfach const weitergeben? /Wie?
     //Get the values for derivative in x-direction:
-    GridFunction Fxx(dim);
+    // ToDo welchen character uebergeben?? Wahrscheinlich egal, da interne beginread.... nicht benutzt werden
+    GridFunction Fxx(dim,'p');
     stencil.ApplyFxxStencilOperator(bread, eread, bwrite, ewrite, sourcegridfunction.GetGridFunction(), Fxx);
     //Get the values for derivative in y-direction:
-    GridFunction Fyy(dim);
+    GridFunction Fyy(dim,'p');
     stencil.ApplyFyyStencilOperator(bread, eread, bwrite, ewrite, sourcegridfunction.GetGridFunction(), Fyy);
 
-    // Compute the residual: res = sqrt(Sum_i^I(Sum_j^J((p_xx+p_yy-rightHandSide)²/(I*J))))
+    // Compute the residual: res = sqrt(Sum_i^I(Sum_j^J((p_xx+p_yy-rightHandSide)ï¿½/(I*J))))
     RealType derivator;
-    for (IndexType i = 1; i <= dim[0]-2; i++)
+    for (IndexType i = bwrite[0]; i <= ewrite[0]; i++)
     {
-    	for (IndexType j = 1; j <= dim[1]-2; j++)
+    	for (IndexType j = bwrite[1]; j <= ewrite[1]; j++)
     	{
     		derivator = Fxx.GetGridFunction()[i][j]+ Fyy.GetGridFunction()[i][j] - rhs[i][j];
-            doubleSum +=  derivator*derivator / (dim[0]-2) / (dim[1]-2);
+            doubleSum +=  derivator*derivator / (ewrite[0]-bwrite[0]+1) / (ewrite[1]-bwrite[1]+1);
     	}
     }
     //std::cout<<doubleSum<<std::endl;
@@ -64,10 +69,14 @@ void Solver::SORCycle(GridFunction* gridfunction,
 			  const PointType& h){
 
 	MultiIndexType dim = gridfunction->GetGridDimension();
-	MultiIndexType bread  (0,0);
-	MultiIndexType eread  (dim[0]-1,dim[1]-1);
-	MultiIndexType bwrite (1,1);
-	MultiIndexType ewrite (dim[0]-2,dim[1]-2);
+	MultiIndexType bread;
+	bread = gridfunction->beginread;
+	MultiIndexType eread;
+	eread = gridfunction->endread;
+	MultiIndexType bwrite;
+	bwrite = gridfunction->beginwrite;
+	MultiIndexType ewrite;
+	ewrite = gridfunction-> endwrite;
 
 	Computation pc (param);
 
@@ -80,9 +89,9 @@ void Solver::SORCycle(GridFunction* gridfunction,
 	{
 
 		pc.setBoundaryP(*gridfunction);
-		 for (IndexType i = 1; i <= dim[0]-2; i++)
+		 for (IndexType i = bwrite[0]; i <= ewrite[0]; i++)
 		{
-			for (IndexType j = 1; j <= dim[1]-2; j++)
+			for (IndexType j = bwrite[1]; j <= ewrite[1]; j++)
 			{
 				//help-values "neighbours_x" and "neighbours_y" for better overview
 				neighbours_x = (gridfunction->GetGridFunction()[i+1][j] + gridfunction->GetGridFunction()[i-1][j])
@@ -96,10 +105,12 @@ void Solver::SORCycle(GridFunction* gridfunction,
 			}
 		}
 		iterationCounter++;
+		// Hier muessen Druckwerte zwischen Prozessoren ausgetauscht werden!!!
+
+
 		res = computeResidual(*gridfunction, rhs, h);
 	}
 	if (iterationCounter >= param.iterMax)
 		std::cout<<"iteration abort with error res = "<<res<<std::endl;
 
 }
-

@@ -13,10 +13,18 @@
 #include "Computation/computation.h"
 #include "Solver/solver.h"
 #include "mpi.h"
+#include "Communication/communication.h"
 
 int main(int argc, char *argv[]){
 	std::cout << "#### SuperFlow3000 ####\n";
 
+	char InputFileName[] = "inputvals.bin";
+	char OutputFolderName[] = "output";  // output folder! -> be careful, if folder is not there, no data are saved
+	// load simparam
+	IO Reader(InputFileName,OutputFolderName);
+	Simparam simparam = Reader.getSimparam();
+
+	//std::cout << simparam.iMax << std::endl;
 	MPI_Init(&argc, &argv);
 
 	int mpiRank;
@@ -26,14 +34,8 @@ int main(int argc, char *argv[]){
 
 
 
-
-	char InputFileName[] = "inputvals.bin";
-	char OutputFolderName[] = "output";  // output folder! -> be careful, if folder is not there, no data are saved
-	// load simparam
-	IO Reader(InputFileName,OutputFolderName);
-	Simparam simparam = Reader.getSimparam();
-	Computation pc (simparam);
-	Solver sol (simparam);
+	//Computation pc (simparam);
+	//Solver sol (simparam);
 	// initialize grids
 	// different sizes for MPI
 
@@ -41,31 +43,38 @@ int main(int argc, char *argv[]){
 	IndexType mpiSizeH = mpiSize/2;
 	IndexType mpiSizeV = 2;
 
-
+	simparam.iMax = 15;
+	simparam.jMax = 15;
+	simparam.GX = 0.0;
+	simparam.GY = 0.0;
+	simparam.PI = 2.0;
 	//Grids sollen gleiche groesse haben!!
 	IndexType il=2;
+
 	IndexType ir=il+(simparam.iMax)/mpiSizeH-1;
+	//std::cout << simparam.xLength << std::endl;
 	IndexType jb=2;
 	IndexType jt=jb+(simparam.jMax)/mpiSizeV-1;
 
 
 	MultiIndexType griddimension ((ir-il+4),(jt-jb+4));
-    GridFunction p(griddimension,simparam.PI);
+    GridFunction p(griddimension,simparam.PI,'p');
     p.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'p');
 
-    GridFunction rhs(griddimension);
+
+    GridFunction rhs(griddimension,'r');
     rhs.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'r');
 
-    GridFunction v(griddimension,simparam.VI);
+    GridFunction v(griddimension,simparam.VI,'v');
     v.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'v');
 
-    GridFunction g(griddimension);
+    GridFunction g(griddimension,'g');
     g.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'g');
 
-    GridFunction u(griddimension,simparam.UI);
+    GridFunction u(griddimension,simparam.UI,'u');
     u.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'u');
 
-    GridFunction f(griddimension);
+    GridFunction f(griddimension,'f');
     f.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'f');
 
     // Durch ir, il, jb und jt abgedeckt
@@ -76,15 +85,16 @@ int main(int argc, char *argv[]){
 
 	const PointType h(simparam.xLength/simparam.iMax , simparam.yLength/simparam.jMax);
 
+	/*
 	RealType deltaT = simparam.deltaT;
 	RealType t = 0;
 	int step = 0;
-
+	 */
 	// so gross wie u
-	GridFunction gx(griddimension,simparam.GX);
-
+	GridFunction gx(griddimension,simparam.GX,'p');
+	//std::cout << simparam.GX << " " << griddimension[0]<< " " << griddimension[1] << " " << ir << " " << il << " " << std::endl;
 	// so gross wie v
-	GridFunction gy(griddimension,simparam.GY);
+	//GridFunction gy(griddimension,simparam.GY,'p');
 
 	//---- for Boundary condition ----
 	//for driven cavity
@@ -102,8 +112,9 @@ int main(int argc, char *argv[]){
 	// write first output data
 
 	//wird hier ein vtk file geschrieben, ohne dass randwerte in matritzen geschrieben wurden?
-	Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step);
+	//Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step);
 	// start time loop
+	/*
 	while (t <= simparam.tEnd){
 
 		// compute deltaT
@@ -114,13 +125,16 @@ int main(int argc, char *argv[]){
 		pc.setBoundaryV(v);
 		// driven cavity:
 		if (u.globalboundary[2]){
-			u.SetGridFunction(u.upperleft,u.upperright,-1.0,offset,2.0);
+			MultiIndexType UpperLeft(1,u.griddimension[1]-1);
+			MultiIndexType UpperRight(u.griddimension[0]-2, u.griddimension[1]-1);
+			u.SetGridFunction(UpperLeft,UpperRight,-1.0,offset,2.0);
 		}
 		//einfach durchfliesen
 		//u.SetGridFunction(linksunten,linksoben,1);
 		//u.SetGridFunction(rechtsunten,rechtsoben,1);
 
 		//u.PlotGrid();
+
 		if (0 == (step % 5)) {
 			Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step);
 		}
@@ -154,77 +168,20 @@ int main(int argc, char *argv[]){
 		// write files
 		std::cout<< step<<"  -  "<<t<<" / " <<simparam.tEnd<<std::endl;
 	}
-
-	GridFunction TestGridU(7,7);
-	for (int i = 0; i < 7; i++) {
-		for (int j = 0; j < 7; j++) {
-			TestGridU.SetGridFunction(i,j,i);
-		}
-	}
-
-	GridFunction TestGridV(7,7);
-		for (int i = 0; i < 7; i++) {
-			for (int j = 0; j < 7; j++) {
-				TestGridV.SetGridFunction(i,j,j);
-			}
-		}
-
-
-	GridFunction DerivGrid(7,7);
-	for (int i = 0; i < 7; i++) {
-		for (int j = 0; j < 7; j++) {
-			DerivGrid.SetGridFunction(i,j,0);
-		}
-	}
-
-	Stencil stenci(3,h);
-	MultiIndexType beginread(0,0);
-	MultiIndexType endread(6,6);
-	MultiIndexType beginwrite(1,1);
-	MultiIndexType endwrite(5,5);
-	stenci.ApplyUVyStencilOperator(beginread,endread,beginwrite,endwrite, TestGridU.GetGridFunction(), TestGridV.GetGridFunction(),DerivGrid, simparam.alpha);
-	std::cout << "bla " << std::endl;
-	DerivGrid.PlotGrid();
-
-	// ToDo Liste
-	/*
-	 * Stencil testen - kommen die richtigen Matrizen raus?
-	 * Solver testen?
-	 * Computation fertig machen
-	 * Stencil andere Ableitungen
-	 * grid wieder zum laufen bekommen
-	 */
-
-	/*// Teste Apply Grid Function
-	GridFunction sourcegridfunction;
-
-	GridFunction imagegridfunctinon;
-
-	ApplyStencilOperator(gridreadbegin,
-				gridreadend,
-				gridwritebegin,
-				gridwriteend,
-				sourcegridfunction,
-				imagegridfunction);
-*/	std::cout<<"laeuft... immerhin ;)";
-
-
-/*	GridFunction testgrid(griddimension,simparam.UI);
-	for (int i = 0; i < griddimension[0]; i++) {
-		for (int j=0; j < griddimension[1]; j++) {
-			testgrid.SetGridFunction(i,j,i);
-		}
-	}
-
-	testgrid.PlotGrid();
-
-	GridFunction derivative(griddimension,0);
-	Stencil sten(3,h);
-	sten.ApplyPxStencilOperator(bb,ee,bb,ee,testgrid.GetGridFunction(),derivative);
-
-	derivative.PlotGrid();
-//bla
 */
+	//u.PlotGrid();
+
+	if (mpiRank == 1) {
+		p.SetGridFunction(p.beginread,p.endread,1);
+		p.PlotGrid();
+	}
+
+	Communication communi(mpiRank, mpiSizeH, mpiSizeV, p.globalboundary);
+	communi.ExchangePValues(p);
+	if (mpiRank == 1) {
+		p.PlotGrid();
+	}
+	MPI_Finalize();
 	return 0;
 }
 

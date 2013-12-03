@@ -8,8 +8,8 @@
 #include "gridfunction.h"
 #include <iostream>
 //1
-GridFunction::GridFunction(int DimX, int DimY){
-	 this->InitializeGlobalBoundary();
+GridFunction::GridFunction(int DimX, int DimY, char indicator){
+	 this->InitializeGlobalBoundary(indicator);
 	 gridfunction = new RealType*[DimX];
 	 for (IndexType i = 0; i < DimX; i++){
 		 gridfunction[i] = new RealType [DimY-1];
@@ -24,8 +24,8 @@ GridFunction::GridFunction(int DimX, int DimY){
 }
 
 //1.1
-GridFunction::GridFunction(int DimX, int DimY, RealType value){
-	 this->InitializeGlobalBoundary();
+GridFunction::GridFunction(int DimX, int DimY, RealType value, char indicator){
+	 this->InitializeGlobalBoundary(indicator);
 	 gridfunction = new RealType*[DimX];
 	 for (IndexType i = 0; i < DimX; i++){
 		 gridfunction[i] = new RealType [DimY-1];
@@ -38,8 +38,8 @@ GridFunction::GridFunction(int DimX, int DimY, RealType value){
 }
 
 //2
-GridFunction::GridFunction(const MultiIndexType griddimension_input) : griddimension(griddimension_input){
-	this->InitializeGlobalBoundary();
+GridFunction::GridFunction(const MultiIndexType griddimension_input, char indicator) : griddimension(griddimension_input){
+	this->InitializeGlobalBoundary(indicator);
 	 gridfunction= new RealType*[griddimension[0]];
 	 for (IndexType i = 0; i < griddimension[0]; i++){
 		 gridfunction[i] = new RealType[griddimension[1]];
@@ -206,7 +206,7 @@ void GridFunction::AddToGridFunction (const MultiIndexType& begin, const MultiIn
 RealType GridFunction::MaxValueGridFunction (const MultiIndexType& begin,
 		const MultiIndexType& end){
 	if (CheckInGrid(begin,end)) {exit(0);}
-	IndexType max = 0;
+	RealType max = 0;
 	for (IndexType i = begin[0];i<=end[0]; i++){
 		for (IndexType j = begin[1]; j<=end[1]; j++){
 			if (gridfunction[i][j] > max)
@@ -226,22 +226,66 @@ void GridFunction::PlotGrid(){
 
 }
 
-void GridFunction::InitializeGlobalBoundaryPosition(int rank, int mpiSizeH, int mpiSizeV, char name){
+void GridFunction::InitializeGlobalBoundaryPosition(int rank, int mpiSizeH, int mpiSizeV, char indicator){
 	if (rank < mpiSizeH){
+		// unterer globaler Rand
 		globalboundary[0] = true;
-		bottomleft[1]= 2;
-		upperleft[1] = 2;
+
+		// p und rhs  --> bleibt gleich
+
+		// u und f  --> bleibt gleich
+
+		// v und g
+		if (indicator == 'v' || indicator == 'g') {
+			beginread[0] = 1; beginread[1] = 1;
+			beginwrite[0] = 2; beginwrite[1] = 2;
+		}
+
 	}
 	if (rank >= (mpiSizeH*mpiSizeV)-mpiSizeH){
+		// oberer globaler Rand
 		globalboundary[2] = true;
+
+		// p und rhs
+
+		// u und f
+
+		// v und g
+
+		if (indicator == 'v' || indicator == 'g') {
+			endread[0] = griddimension[0] - 1; endread[1] = griddimension[1] - 2;
+			endwrite[0] = griddimension[0] -2; endwrite[1] = griddimension[1] - 3;
+		}
+
 	}
 	if ((rank+1) % mpiSizeH) {
+		// rechter globaler Rand
 		globalboundary[1] = true;
+
+		// p und rhs --> bleibt gleich
+
+		// u und f
+
+		if (indicator == 'u' || indicator == 'f') {
+			endread[0] = griddimension[0] - 2; endread[1] = griddimension[1] - 1;
+			endwrite[0] = griddimension[0] - 3; endwrite[1] = griddimension[1] - 2;
+
+		}
+
+		// v und g --> bleibt gleich
 	}
 	if (rank%mpiSizeH) {
+		// linker globaler Rand
 		globalboundary[3] = true;
-		bottomleft[0] = 2;
-		upperleft[0] = 2;
+
+		// p und rhs --> bleibt gleich
+
+		// u und f
+		if (indicator == 'u' || indicator == 'f') {
+			beginread[0] = 1; beginread[1] = 1;
+			beginwrite[0] = 2; beginwrite[1] = 2;
+		}
+		// v und g
 	}
 }
 
@@ -289,6 +333,38 @@ void GridFunction::InitializeGlobalBoundary(char indicator) {
 	upperleft[0] = 1;
 	upperleft[1] = griddimension[1] - 2;
 }
+
+/*
+RealType* GridFunction::GetSlice(MultiIndexType bb, MultiIndexType ee){
+	if (CheckInGrid(bb,ee)) {exit(0);}
+	if (ee[0]-bb[0] >0 && ee[1]-bb[1]>0){
+		std::cout<< "error: not a slice!\n";
+		exit(0);
+	}
+	IndexType size;
+
+	if (ee[1]-bb[1] > 1) {
+		size = ee[1]-bb[1]+1;
+		RealType slice[size];
+		for (IndexType i = 0; i < size; i++) {
+			slice[i] = gridfunction[bb[0]][bb[1]+i];
+		}
+		return slice;
+	}
+	else {
+		size = ee[0]-bb[0]+1;
+		RealType slice[size];
+		for (IndexType i = 0; i < size; i++) {
+			slice[i] = gridfunction[bb[0]+i][bb[1]];
+		}
+		return slice;
+	}
+
+
+}
+*/
+
+
 bool GridFunction::CheckInGrid(const MultiIndexType& begin, const MultiIndexType& end){
 	bool error = false;
 	if (begin[0]>end[0]){

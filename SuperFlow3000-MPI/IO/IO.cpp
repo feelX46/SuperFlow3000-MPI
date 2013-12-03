@@ -80,6 +80,7 @@ IO::readInputfile (char *filename)
 	file.getline(line,sizeof(line));
 	sscanf(line, "%*[^0-9]%lf", &simparam.PI);
 
+
 }
 
 #define Element(field,ic) ((field)[(ic)[0]][(ic)[1]])
