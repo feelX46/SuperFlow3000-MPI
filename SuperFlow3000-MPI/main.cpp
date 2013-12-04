@@ -21,17 +21,17 @@ int main(int argc, char *argv[]){
 	char InputFileName[] = "inputvals.bin";
 	char OutputFolderName[] = "output";  // output folder! -> be careful, if folder is not there, no data are saved
 	// load simparam
+
+	Simparam simparam;
 	IO Reader(InputFileName,OutputFolderName);
-	Simparam simparam = Reader.getSimparam();
+	simparam = Reader.getSimparam();
 
 	//std::cout << simparam.iMax << std::endl;
 	MPI_Init(&argc, &argv);
-
 	int mpiRank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpiRank);
 	int mpiSize;
 	MPI_Comm_size(MPI_COMM_WORLD, &mpiSize);
-
 
 
 	//Computation pc (simparam);
@@ -43,11 +43,6 @@ int main(int argc, char *argv[]){
 	IndexType mpiSizeH = mpiSize/2;
 	IndexType mpiSizeV = 2;
 
-	simparam.iMax = 15;
-	simparam.jMax = 15;
-	simparam.GX = 0.0;
-	simparam.GY = 0.0;
-	simparam.PI = 2.0;
 	//Grids sollen gleiche groesse haben!!
 	IndexType il=2;
 
@@ -60,6 +55,7 @@ int main(int argc, char *argv[]){
 	MultiIndexType griddimension ((ir-il+4),(jt-jb+4));
     GridFunction p(griddimension,simparam.PI,'p');
     p.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'p');
+   // std::cout << "rank: " << mpiRank << " boundary unten: " << p.globalboundary[0] << " boundary rechts: " << p.globalboundary[1] << " boundary oben: " << p.globalboundary[2] << " boundary links: " << p.globalboundary[3] << std::endl;
 
 
     GridFunction rhs(griddimension,'r');
@@ -171,16 +167,35 @@ int main(int argc, char *argv[]){
 */
 	//u.PlotGrid();
 
-	if (mpiRank == 1) {
+
+
+	if (mpiRank == 0) {
 		p.SetGridFunction(p.beginread,p.endread,1);
+		// hier passiert ein fehler fuer prozessorenzahlen ab 6 !!??
 		p.PlotGrid();
 	}
+	MPI_Barrier(MPI_COMM_WORLD);
+	if (mpiRank == 2) {
+		p.SetGridFunction(p.beginread,p.endread,2);
+		std::cout << "Rank 1----------------------------------------------" << std::endl;
+		p.PlotGrid();
+		std::cout << "Rank 1----------------------------------------------" << std::endl;
+	}
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	Communication communi(mpiRank, mpiSizeH, mpiSizeV, p.globalboundary);
 	communi.ExchangePValues(p);
-	if (mpiRank == 1) {
+
+	if (mpiRank == 0) {
 		p.PlotGrid();
 	}
+	MPI_Barrier(MPI_COMM_WORLD);
+	if (mpiRank == 2) {
+			std::cout << "Rank 1----------------------------------------------" << std::endl;
+			p.PlotGrid();
+			std::cout << "Rank 1----------------------------------------------" << std::endl;
+		}
+	MPI_Barrier(MPI_COMM_WORLD);
 	MPI_Finalize();
 	return 0;
 }

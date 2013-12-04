@@ -209,8 +209,8 @@ RealType GridFunction::MaxValueGridFunction (const MultiIndexType& begin,
 	RealType max = 0;
 	for (IndexType i = begin[0];i<=end[0]; i++){
 		for (IndexType j = begin[1]; j<=end[1]; j++){
-			if (gridfunction[i][j] > max)
-				max = gridfunction[i][j];
+			if (abs(gridfunction[i][j]) > max)
+				max = abs(gridfunction[i][j]);
 		}
 	}
 	return max;
@@ -258,7 +258,7 @@ void GridFunction::InitializeGlobalBoundaryPosition(int rank, int mpiSizeH, int 
 		}
 
 	}
-	if ((rank+1) % mpiSizeH) {
+	if (((rank+1) % mpiSizeH) == 0) {
 		// rechter globaler Rand
 		globalboundary[1] = true;
 
@@ -274,7 +274,7 @@ void GridFunction::InitializeGlobalBoundaryPosition(int rank, int mpiSizeH, int 
 
 		// v und g --> bleibt gleich
 	}
-	if (rank%mpiSizeH) {
+	if ((rank%mpiSizeH) == 0) {
 		// linker globaler Rand
 		globalboundary[3] = true;
 
