@@ -27,8 +27,9 @@ void Computation::computeNewVelocities(GridFunction* u, GridFunction* v,
                                 GridFunctionType& p, const PointType& h,
                                 RealType deltaT){
 	//compute u
-	MultiIndexType bb = u->bottomleft;
-	MultiIndexType ee(u->upperright[0],u->upperright[1]);
+	// hier stand vorher bottom left und upper right - nicht mehr aktuell gewesen?!
+	MultiIndexType bb (u->beginwrite[0],u->beginwrite[1]);
+	MultiIndexType ee(u->endwrite[0],u->endwrite[1]);
 	u->SetGridFunction(bb,ee,1,f);
 	RealType factor = -deltaT/h[0];
 	MultiIndexType offset (1,0);
@@ -37,7 +38,10 @@ void Computation::computeNewVelocities(GridFunction* u, GridFunction* v,
 	u->AddToGridFunction (bb,ee,-factor,p,offset);
 
 	//compute v
-	ee[0]= u->griddimension[0]-2; ee[1]= u->griddimension[1]-3;
+	bb[0] = v->beginwrite[0]; bb[1] = v->beginwrite[1];
+	ee[0] = v->endwrite[0]; bb[1] = v->endwrite[1];
+	// so wars vorher
+	//ee[0]= u->griddimension[0]-2; ee[1]= u->griddimension[1]-3;
 	v->SetGridFunction(bb,ee,1,g);
 	factor = -deltaT/h[1];
 	offset[1]=1;
@@ -212,31 +216,31 @@ void Computation::setBoundaryP(GridFunction& p){
 
 	// left
 	if(p.globalboundary[3]) {
-		bb[0] = 1; bb[1] = 2;
-		ee[0] = 1; ee[1] = p.griddimension[1]-2;
+		bb[0] = p.beginread[0]; bb[1] = p.beginread[1];
+		ee[0] = p.beginread[0]; ee[1] = p.endread[1];
 		offset[0] = 1;
 		offset[1] = 0;
 		p.SetGridFunction(bb,ee,1,offset);
 	}
     //right
 	if(p.globalboundary[1]) {
-		bb[0] = p.griddimension[0]-1; bb[1] = 2;
-		ee[0] = p.griddimension[0]-1; ee[1] = p.griddimension[1]-2;
+		bb[0] = p.endread[0]; bb[1] = p.beginread[1];
+		ee[0] = p.endread[0]; ee[1] = p.endread[1];
 		offset[0]=-1;
 		offset[1] = 0;
 		p.SetGridFunction(bb,ee,1,offset);
 	}
     //bottom
 	if(p.globalboundary[0]) {
-		bb[0] = 2; bb[1] = 1;
-		ee[0] = p.griddimension[0]-2; ee[1] = 1;
+		bb[0] = p.beginread[0]; bb[1] = p.beginread[1];
+		ee[0] = p.endread[0]; ee[1] = p.beginread[1];
 		offset[0]=0; offset[1]=1;
 		p.SetGridFunction(bb,ee,1,offset);
 	}
     //top
 	if(p.globalboundary[2]) {
-		bb[0] = 2; bb[1] = p.griddimension[1]-1;
-		ee[0] = p.griddimension[0]-2; ee[1] = p.griddimension[1]-1;
+		bb[0] = p.beginread[0]; bb[1] = p.endread[1];
+		ee[0] = p.endread[0]; ee[1] = p.endread[1];
 		offset[0]=0; offset[1]=-1;
 		p.SetGridFunction(bb,ee,1,offset);
 	}
@@ -248,14 +252,14 @@ void Computation::setBoundaryF(GridFunction& f, GridFunctionType& u){
 
 	// left
 	if(f.globalboundary[2]) {
-		bb[0] = 1; bb[1] = 2;
-		ee[0] = 1; ee[1] = f.griddimension[1]-2;
+		bb[0] = f.beginread[0]; bb[1] = f.beginread[1];
+		ee[0] = f.beginread[0]; ee[1] = f.endread[1];
 		f.SetGridFunction(bb,ee,1,u);
 	}
     //right
 	if(f.globalboundary[1]) {
-		bb[0] = f.griddimension[0]-2; bb[1] = 2;
-		ee[0] = f.griddimension[0]-2; ee[1] = f.griddimension[1]-2;
+		bb[0] = f.endread[0]; bb[1] = f.beginread[1];
+		ee[0] = f.endread[0]; ee[1] = f.endread[1];
 		f.SetGridFunction(bb,ee,1,u);
 	}
 }
@@ -266,14 +270,14 @@ void Computation::setBoundaryG(GridFunction& g, GridFunctionType& v){
 
 	//bottom
 	if(g.globalboundary[0]) {
-		bb[0] = 2; bb[1] = 1;
-		ee[0] = g.griddimension[0]-2; ee[1] = 1;
+		bb[0] = g.beginread[0]; bb[1] = g.beginread[1];
+		ee[0] = g.endread[0]; ee[1] = g.beginread[1];
 		g.SetGridFunction(bb,ee,1,v);
 	}
     //top
 	if(g.globalboundary[2]) {
-		bb[0] = 2; bb[1] = g.griddimension[1]-2;
-		ee[0] = g.griddimension[0]-2; ee[1] = g.griddimension[1]-2;
+		bb[0] = g.beginread[0]; bb[1] = g.endread[1];
+		ee[0] = g.endread[1]; ee[1] = g.endread[1];
 		g.SetGridFunction(bb,ee,1,v);
 	}
 }

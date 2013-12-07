@@ -33,15 +33,22 @@ int main(int argc, char *argv[]){
 	int mpiSize;
 	MPI_Comm_size(MPI_COMM_WORLD, &mpiSize);
 
-
-	//Computation pc (simparam);
-	//Solver sol (simparam);
-	// initialize grids
-	// different sizes for MPI
-
 	// willkuerliche gewaehlt - vertikal immer nur zwei gebiete
-	IndexType mpiSizeH = mpiSize/2;
+
 	IndexType mpiSizeV = 2;
+	IndexType mpiSizeH = 2;
+
+	bool plot = false;
+
+	//IndexType mpiSizeH = 1;
+	//IndexType mpiSizeV = 1;
+
+
+
+
+	Computation pc (simparam);
+	Solver sol (simparam);
+
 
 	//Grids sollen gleiche groesse haben!!
 	IndexType il=2;
@@ -53,10 +60,9 @@ int main(int argc, char *argv[]){
 
 
 	MultiIndexType griddimension ((ir-il+4),(jt-jb+4));
-    GridFunction p(griddimension,simparam.PI,'p');
-    p.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'p');
-   // std::cout << "rank: " << mpiRank << " boundary unten: " << p.globalboundary[0] << " boundary rechts: " << p.globalboundary[1] << " boundary oben: " << p.globalboundary[2] << " boundary links: " << p.globalboundary[3] << std::endl;
 
+	GridFunction p(griddimension,simparam.PI,'p');
+    p.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'p');
 
     GridFunction rhs(griddimension,'r');
     rhs.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'r');
@@ -73,6 +79,9 @@ int main(int argc, char *argv[]){
     GridFunction f(griddimension,'f');
     f.InitializeGlobalBoundaryPosition(mpiRank,mpiSizeH,mpiSizeV,'f');
 
+
+
+
     // Durch ir, il, jb und jt abgedeckt
     /*
     MultiIndexType bb(1,1); //lower left
@@ -81,16 +90,16 @@ int main(int argc, char *argv[]){
 
 	const PointType h(simparam.xLength/simparam.iMax , simparam.yLength/simparam.jMax);
 
-	/*
+
 	RealType deltaT = simparam.deltaT;
 	RealType t = 0;
 	int step = 0;
-	 */
+	std::cout << "Schritt 1" << std::endl;
 	// so gross wie u
-	GridFunction gx(griddimension,simparam.GX,'p');
-	//std::cout << simparam.GX << " " << griddimension[0]<< " " << griddimension[1] << " " << ir << " " << il << " " << std::endl;
+	GridFunction gx(griddimension,simparam.GX,'u');
+
 	// so gross wie v
-	//GridFunction gy(griddimension,simparam.GY,'p');
+	GridFunction gy(griddimension,simparam.GY,'v');
 
 	//---- for Boundary condition ----
 	//for driven cavity
@@ -108,32 +117,56 @@ int main(int argc, char *argv[]){
 	// write first output data
 
 	//wird hier ein vtk file geschrieben, ohne dass randwerte in matritzen geschrieben wurden?
-	//Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step);
-	// start time loop
-	/*
-	while (t <= simparam.tEnd){
 
+	if (mpiRank == 3) {
+		Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step);
+	}
+	// start time loop
+	Communication communicator(mpiRank, mpiSizeH, mpiSizeV, p.globalboundary);
+	while (t <= simparam.tEnd){
 		// compute deltaT
-		deltaT = 0.1;
+		deltaT = 0.005;
 		//deltaT = pc.computeTimestep(u.MaxValueGridFunction(bb,ee),v.MaxValueGridFunction(bb,ee),h);
 		// set boundary
 		pc.setBoundaryU(u); //First implementation: only no-flow boundaries-> everything is zero!
 		pc.setBoundaryV(v);
 		// driven cavity:
+
 		if (u.globalboundary[2]){
-			MultiIndexType UpperLeft(1,u.griddimension[1]-1);
+			//MultiIndexType UpperLeft(1,u.griddimension[1]-1);
+			MultiIndexType UpperLeft(0,u.griddimension[1]-1);
 			MultiIndexType UpperRight(u.griddimension[0]-2, u.griddimension[1]-1);
 			u.SetGridFunction(UpperLeft,UpperRight,-1.0,offset,2.0);
 		}
+		//Testrandwerte
+		/*if (mpiRank==2){
+			MultiIndexType LowerLeft(u.beginwrite[0],u.beginwrite[1]);
+			MultiIndexType UpperLeft(u.beginwrite[0], u.endwrite[1]);
+			u.SetGridFunction(LowerLeft,UpperLeft,2.0);
+		}*/
 		//einfach durchfliesen
-		//u.SetGridFunction(linksunten,linksoben,1);
+		//u.SetGridFunction(linksunten,linkusoben,1);
 		//u.SetGridFunction(rechtsunten,rechtsoben,1);
 
 		//u.PlotGrid();
-
-		if (0 == (step % 5)) {
+		/*std::cout << "Rank: " << mpiRank << " 0: ";
+		if (u.globalboundary[0]) std::cout << 1;
+		else std::cout << 0;
+		std::cout << " 1: ";
+		if (u.globalboundary[1]) std::cout << 1;
+		else std::cout << 0;
+		std::cout << " 2: ";
+		if (u.globalboundary[2]) std::cout << 1;
+		else std::cout << 0;
+		std::cout << " 3: ";
+		if (u.globalboundary[3]) std::cout <<1;
+		else std::cout << 0;
+		std::cout << std::endl;
+*/
+		if ((step%5) == 0 && mpiRank == 3) {
 			Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step);
 		}
+
 
 	    // compute f / g
 		GridFunctionType blgx = gx.GetGridFunction(); //ToDo: schoener machen!
@@ -151,11 +184,110 @@ int main(int argc, char *argv[]){
 		// solver
 		//ToDo enventuell muss die iterationschleife hier rein!
 		GridFunctionType blrhs = rhs.GetGridFunction();
-		sol.SORCycle(&p,blrhs,h);
 
+		sol.SORCycle(&p,blrhs,h,&communicator);
+
+		if (plot == true) {
+		MPI_Barrier(MPI_COMM_WORLD);
+		if (mpiRank == 0) {
+			std::cout << "Rank: " << mpiRank<< std::endl;
+			u.PlotGrid();
+			std::cout << "--------------------------" << std::endl;
+
+		}
+
+		MPI_Barrier(MPI_COMM_WORLD);
+			if (mpiRank == 1) {
+				std::cout << "Rank: " << mpiRank<< std::endl;
+				u.PlotGrid();
+				std::cout << "--------------------------" << std::endl;
+
+			}
+		MPI_Barrier(MPI_COMM_WORLD);
+				if (mpiRank == 2) {
+					std::cout << "Rank: " << mpiRank<< std::endl;
+					u.PlotGrid();
+					std::cout << "--------------------------" << std::endl;
+				}
+		MPI_Barrier(MPI_COMM_WORLD);
+				if (mpiRank == 3) {
+					std::cout << "Rank: " << mpiRank<< std::endl;
+					u.PlotGrid();
+					std::cout << "--------------------------" << std::endl;
+				}
+		}
 		//Update velocity
 		GridFunctionType blp = p.GetGridFunction();
 		pc.computeNewVelocities(&u, &v,blf,blg,blp,h,deltaT);
+
+		if (plot == true) {
+		MPI_Barrier(MPI_COMM_WORLD);
+		if (mpiRank == 0) {
+			std::cout << "Rank: " << mpiRank<< std::endl;
+			u.PlotGrid();
+			std::cout << "--------------------------" << std::endl;
+
+		}
+
+		MPI_Barrier(MPI_COMM_WORLD);
+			if (mpiRank == 1) {
+				std::cout << "Rank: " << mpiRank<< std::endl;
+				u.PlotGrid();
+				std::cout << "--------------------------" << std::endl;
+
+			}
+		MPI_Barrier(MPI_COMM_WORLD);
+				if (mpiRank == 2) {
+					std::cout << "Rank: " << mpiRank<< std::endl;
+					u.PlotGrid();
+					std::cout << "--------------------------" << std::endl;
+				}
+		MPI_Barrier(MPI_COMM_WORLD);
+				if (mpiRank == 3) {
+					std::cout << "Rank: " << mpiRank<< std::endl;
+					u.PlotGrid();
+					std::cout << "--------------------------" << std::endl;
+				}
+
+		}
+
+
+
+		communicator.ExchangePValues(u);
+		communicator.ExchangePValues(v);
+
+		if (plot == true) {
+		MPI_Barrier(MPI_COMM_WORLD);
+		if (mpiRank == 0) {
+			std::cout << "Rank: " << mpiRank<< std::endl;
+			u.PlotGrid();
+			std::cout << "--------------------------" << std::endl;
+
+		}
+
+		MPI_Barrier(MPI_COMM_WORLD);
+			if (mpiRank == 1) {
+				std::cout << "Rank: " << mpiRank<< std::endl;
+				u.PlotGrid();
+				std::cout << "--------------------------" << std::endl;
+
+			}
+		MPI_Barrier(MPI_COMM_WORLD);
+				if (mpiRank == 2) {
+					std::cout << "Rank: " << mpiRank<< std::endl;
+					u.PlotGrid();
+					std::cout << "--------------------------" << std::endl;
+				}
+		MPI_Barrier(MPI_COMM_WORLD);
+				if (mpiRank == 3) {
+					std::cout << "Rank: " << mpiRank<< std::endl;
+					u.PlotGrid();
+					std::cout << "--------------------------" << std::endl;
+				}
+		}
+
+
+
 		// update time
 		t += deltaT;
 		step++;
@@ -164,11 +296,10 @@ int main(int argc, char *argv[]){
 		// write files
 		std::cout<< step<<"  -  "<<t<<" / " <<simparam.tEnd<<std::endl;
 	}
-*/
-	//u.PlotGrid();
 
 
 
+/*
 	if (mpiRank == 0) {
 		p.SetGridFunction(p.beginread,p.endread,1);
 		// hier passiert ein fehler fuer prozessorenzahlen ab 6 !!??
@@ -183,8 +314,8 @@ int main(int argc, char *argv[]){
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	Communication communi(mpiRank, mpiSizeH, mpiSizeV, p.globalboundary);
-	communi.ExchangePValues(p);
+
+
 
 	if (mpiRank == 0) {
 		p.PlotGrid();
@@ -195,7 +326,7 @@ int main(int argc, char *argv[]){
 			p.PlotGrid();
 			std::cout << "Rank 1----------------------------------------------" << std::endl;
 		}
-	MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);*/
 	MPI_Finalize();
 	return 0;
 }

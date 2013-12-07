@@ -19,7 +19,6 @@ public:
 	//~Communication();
 
 	void ExchangePValues(GridFunction& p);
-	void ExchangeValues(GridFunction& p, int rank);
 
 	IndexType neighbors[4];
 

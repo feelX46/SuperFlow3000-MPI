@@ -66,7 +66,8 @@ RealType Solver::computeResidual(GridFunction& sourcegridfunction,
 
 void Solver::SORCycle(GridFunction* gridfunction,
 			  GridFunctionType& rhs,
-			  const PointType& h){
+			  const PointType& h,
+			  Communication* communicator){
 
 	MultiIndexType dim = gridfunction->GetGridDimension();
 	MultiIndexType bread;
@@ -85,9 +86,10 @@ void Solver::SORCycle(GridFunction* gridfunction,
 	int iterationCounter = 0;
 	// SOR-cycling until error is small enough, or the number of iterations gets to high:
 	RealType neighbours_x, neighbours_y;
-	while (iterationCounter < param.iterMax && res > param.eps )
-	{
 
+	// ToDo Residuum fuer MPI berechnen
+	while (iterationCounter < param.iterMax)// && res > param.eps )
+	{
 		pc.setBoundaryP(*gridfunction);
 		 for (IndexType i = bwrite[0]; i <= ewrite[0]; i++)
 		{
@@ -107,7 +109,8 @@ void Solver::SORCycle(GridFunction* gridfunction,
 		iterationCounter++;
 		// Hier muessen Druckwerte zwischen Prozessoren ausgetauscht werden!!!
 
-
+		communicator->ExchangePValues(*gridfunction);
+		// ToDo Residuum fuer MPI berechnen
 		res = computeResidual(*gridfunction, rhs, h);
 	}
 	if (iterationCounter >= param.iterMax)

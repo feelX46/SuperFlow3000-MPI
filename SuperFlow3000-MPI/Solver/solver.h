@@ -12,6 +12,7 @@
 #include"../Misc/typedef.h"
 #include"../Grid/gridfunction.h"
 #include "../IO/IO.hpp"
+#include "../Communication/communication.h"
 /*! @class Class Solver runs the Successive-Over-Relaxation-Cycle
  *
  */
@@ -39,7 +40,8 @@ public:
     		   */
     void SORCycle(GridFunction* gridfunction,
     	    	  GridFunctionType& rhs,
-    	    	  const PointType& h);
+    	    	  const PointType& h,
+    	    	  Communication* communicator);
 
 
 private:

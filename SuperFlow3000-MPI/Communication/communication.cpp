@@ -40,6 +40,9 @@ Communication::Communication(int rank, int mpiSizeH, int mpiSizeV, bool *globalb
 	if(rank == 2) {red = false;}
 	if(rank == 3) {red = true;}
 
+
+	//std::cout << "Rank: " << rank << " n0 " << neighbors[0] << " n1 " << neighbors[1] << " n2 " << neighbors[2] << " n3 " << neighbors[3] << std::endl;
+
 	/*
 	//ToDo  hier muss noch allgemeiner formuliert werden - gerade nur gueltig fuer mpiSizeV = 2 und mpiSizeH ungerade
 	if (mpiSizeH%2 == 1 ) {
@@ -64,19 +67,19 @@ void Communication::ExchangePValues(GridFunction& p){
 
 	// !!! LINKS RECHTS TAUSCHEN !!!
 	IndexType sizeV = p.endwrite[1]-p.beginwrite[1]+1;
+	//IndexType sizeV = p.endwrite[1]-p.beginwrite[1]+3;
 
 	double sliceV[sizeV];
 
 	if (red == false) {
-
 		// rechter Nachbar vorhanden
 		if (neighbors[1] >= 0) {
 			// kopiere rechter rand in array
 			for (int i=0; i < sizeV; i++) {
 				sliceV[i] = p.GetGridFunction()[p.endwrite[0]][p.beginwrite[1]+i];
+				//sliceV[i] = p.GetGridFunction()[p.endwrite[0]][p.beginwrite[1]-1+i];
 			}
 			// sende nach rechts
-			std::cout << " Sende von red = " << red << " nach " << neighbors[1] << std::endl;
 			MPI_Send(&sliceV, sizeV, MPI_DOUBLE, neighbors[1], 0, MPI_COMM_WORLD);
 
 			// warte auf receive von rechts (zweig red == true)
@@ -85,6 +88,7 @@ void Communication::ExchangePValues(GridFunction& p){
 			// schreibe sliceV in gridfunction
 			for (int i = 0; i < sizeV; i++) {
 				p.SetGridFunction(p.endread[0],p.beginwrite[1]+i,sliceV[i]);
+				//p.SetGridFunction(p.endread[0],p.beginwrite[1]-1+i,sliceV[i]);
 			}
 
 		}
@@ -93,6 +97,7 @@ void Communication::ExchangePValues(GridFunction& p){
 			// schreibe array mit linkem rand
 			for (int i=0; i < sizeV; i++) {
 				sliceV[i] = p.GetGridFunction()[p.beginwrite[0]][p.beginwrite[1]+i];
+				//sliceV[i] = p.GetGridFunction()[p.beginwrite[0]][p.beginwrite[1]-1+i];
 			}
 			// sende nach links
 			MPI_Send(&sliceV, sizeV, MPI_DOUBLE, neighbors[3], 0, MPI_COMM_WORLD);
@@ -103,6 +108,7 @@ void Communication::ExchangePValues(GridFunction& p){
 			// schreibe sliceV in gridfunction
 			for (int i = 0; i < sizeV; i++) {
 				p.SetGridFunction(p.beginread[0],p.beginwrite[1]+i,sliceV[i]);
+				//p.SetGridFunction(p.beginread[0],p.beginwrite[1]-1+i,sliceV[i]);
 			}
 
 		}
@@ -117,10 +123,12 @@ void Communication::ExchangePValues(GridFunction& p){
 			// schreibe array in gridfunction
 			for (int i = 0; i < sizeV; i++) {
 				p.SetGridFunction(p.beginread[0],p.beginwrite[1]+i,sliceV[i]);
+				//p.SetGridFunction(p.beginread[0],p.beginwrite[1]-1+i,sliceV[i]);
 			}
 			// schreibe array fuer kopieren nach links
 			for (int i=0; i < sizeV; i++) {
 				sliceV[i] = p.GetGridFunction()[p.beginwrite[0]][p.beginwrite[1]+i];
+				//sliceV[i] = p.GetGridFunction()[p.beginwrite[0]][p.beginwrite[1]-1+i];
 			}
 			// sende array nach links
 			MPI_Send(&sliceV, sizeV, MPI_DOUBLE, neighbors[3], 0, MPI_COMM_WORLD);
@@ -131,18 +139,19 @@ void Communication::ExchangePValues(GridFunction& p){
 			MPI_Recv(&sliceV, sizeV, MPI_DOUBLE, neighbors[1], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			// schreibe array in gridfunction
 			for (int i = 0; i < sizeV; i++) {
-				p.SetGridFunction(p.endread[0],p.beginwrite[1]+i,sliceV[i]);
+				p.SetGridFunction(p.endread[0],p.beginwrite[1]-1+i,sliceV[i]);
 			}
 
 			// schreibe array fuer kopieren nach rechts
 			for (int i=0; i < sizeV; i++) {
-				sliceV[i] = p.GetGridFunction()[p.endwrite[0]][p.beginwrite[1]+i];
+				sliceV[i] = p.GetGridFunction()[p.endwrite[0]][p.beginwrite[1]-1+i];
 			}
 			// sende array nach rechts
 			MPI_Send(&sliceV, sizeV, MPI_DOUBLE, neighbors[1], 0, MPI_COMM_WORLD);
 
 		}
 		}
+
 
 	// !! OBEN UNTEN TAUSCHEN !!
 	IndexType sizeH = p.endwrite[0]-p.beginwrite[0]+1;
@@ -233,26 +242,4 @@ void Communication::ExchangePValues(GridFunction& p){
 	}
 
 	}
-
-void Communication::ExchangeValues(GridFunction& p, int rank){
-
-	IndexType sizeV = p.endwrite[1]-p.beginwrite[1]+1;
-	double sliceV[sizeV];
-
-	if (rank ==1) {
-		for (int i=0; i < sizeV; i++) {
-			sliceV[i] = p.GetGridFunction()[p.endwrite[0]][p.beginwrite[1]+i];
-		}
-		MPI_Send(&sliceV, sizeV, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
-		std::cout << " hat gesendet" << std::endl;
-	}
-	if (rank == 0) {
-		MPI_Recv(&sliceV, sizeV, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		// schreibe sliceV in gridfunction
-		for (int i = 0; i < sizeV; i++) {
-			p.SetGridFunction(p.endread[0],p.beginwrite[1]+i,sliceV[i]);
-		}
-		std::cout << "Hat received" << std::endl;
-	}
-}
 
