@@ -12,7 +12,7 @@
 #include <iostream>
 #include <fstream>
 #include "../Structs/simparam.h"
-
+#include "../Grid/gridfunction.h"
 
 class IO
 {
@@ -40,6 +40,17 @@ public:
   void writeVTKFile (const MultiIndexType& griddimension,
 		     GridFunctionType u, GridFunctionType v,
 		     GridFunctionType p, const PointType& delta, int step);
+
+  // new!!! for MPI
+    void writeVTKMasterfile(const IndexType& mpiSizeH, const IndexType& mpiSizeV, int step,
+  			int localgriddimensionX, int localgriddimensionY);
+
+    void writeVTKSlavefile (GridFunction& u_gridfunction,
+  		  GridFunction& v_gridfunction, GridFunction& p_gridfunction,
+  		  const PointType& delta, int mpiSizeH, int mpiSizeV, int step,
+  		  int rank);
+
+
 
 
   //! Method that returns private member variable simparam

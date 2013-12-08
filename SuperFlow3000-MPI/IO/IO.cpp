@@ -1,5 +1,6 @@
 #include "IO.hpp"
 #include <iostream>
+#include <math.h>
 #include <stdio.h>
 using namespace std;
 
@@ -274,4 +275,171 @@ IO::writeVTKFile (const MultiIndexType& griddimension, GridFunctionType u,
     << "</StructuredGrid>" << std::endl << "</VTKFile>" << std::endl;
   fb.close ();
   //std::cout<<"saved in "<< filename<<std::endl;
+}
+
+
+void IO::writeVTKMasterfile(const IndexType& mpiSizeH, const IndexType& mpiSizeV, int step,
+		int localgriddimensionX, int localgriddimensionY){
+
+	  int x1, x2, x3, x4;
+	  int globalgriddimensionX = localgriddimensionX*mpiSizeH;
+	  int globalgriddimensionY = localgriddimensionY*mpiSizeV;
+	  int processorgridcoordX;
+	  int processorgridcoordY;
+	  int nprocessor = mpiSizeH*mpiSizeV;
+	  char numstr[21];
+	  sprintf (numstr, "%d", step);
+	  std::string filename;
+	  filename.append ("./");
+	  filename.append (output);
+	  filename.append ("/");
+	  filename.append ("sol_");
+	  filename.append (numstr);
+	  filename.append ("_master.pvts");
+
+	  std::filebuf fb; // ?
+	  fb.open (const_cast < char *>(filename.c_str ()), std::ios::out);
+	  std::ostream os (&fb);
+	  os << "<?xml version=\"1.0\"?>" << std::endl
+	    << "<VTKFile type=\"PStructuredGrid\">" << std::endl
+	    << "<PStructuredGrid WholeExtent=\""
+	    << "0" << " " << (globalgriddimensionX - 1) << " "
+	    << "0" << " " << (globalgriddimensionY - 1) << " "
+	    << "0" << " " << "0" << " "
+	    << "\" GhostLevel=\"" << "0" << "\">" << std::endl;
+	  os <<"<PPoints>"<<std::endl;
+	  os <<"<PDataArray type=\"Float64\" format=\"ascii\" NumberOfComponents=\"3\"/>"  <<std::endl;
+	  os <<"</PPoints>"<<std::endl;
+	  for(int rank=0; rank<nprocessor; rank++){
+		    processorgridcoordX = rank % mpiSizeH;
+		    processorgridcoordY = floor(rank / mpiSizeH);
+			x1=processorgridcoordX    *localgriddimensionX;
+			x2=(processorgridcoordX+1)*localgriddimensionX-1;
+			x3=processorgridcoordY    *localgriddimensionY;
+			x4=(processorgridcoordY+1)*localgriddimensionY-1;
+
+		  os << "<Piece Extent=\""<<x1<<" "<<x2<<" "<<x3<<" "<<x4<<" 0 0 "
+			<<"\" Source=\"sol_"<<numstr<<"_rank"<<rank<<".vts\"/>"<<std::endl;
+	  }
+
+	  os <<"<PPointData Vectors=\"field\"  Scalars=\"P\">"<<std::endl;
+	  os <<"<PDataArray Name=\"field\" NumberOfComponents=\"3\" type=\"Float64\" />"  <<std::endl;
+	  os <<"<PDataArray type=\"Float64\" Name=\"p\"/>"<<std::endl
+	    <<"</PPointData>"<<std::endl
+        << "</PStructuredGrid>" << std::endl
+	    <<"</VTKFile>"<< std::endl;
+	  fb.close ();
+}
+
+void IO::writeVTKSlavefile(GridFunction& u_gridfunction,
+		  GridFunction& v_gridfunction, GridFunction& p_gridfunction,
+		  const PointType& delta, int mpiSizeH, int mpiSizeV, int step,
+		  int rank){
+
+	double deltaX =delta[0];
+	double deltaY =delta[1];
+	//ToDo: einkommentieren!
+	int ibegin = p_gridfunction.beginwrite[0];
+	int iend   = p_gridfunction.endwrite[0];
+	int jbegin = p_gridfunction.beginwrite[1];
+	int jend   = p_gridfunction.endwrite[1];
+	GridFunctionType p = p_gridfunction.GetGridFunction();
+	GridFunctionType u = u_gridfunction.GetGridFunction();
+	GridFunctionType v = v_gridfunction.GetGridFunction();
+	int localgriddimensionX = iend-ibegin+1;
+	int localgriddimensionY = jend-jbegin+1;
+	int globalgriddimensionX = localgriddimensionX*mpiSizeH;
+	int globalgriddimensionY = localgriddimensionY*mpiSizeV;
+
+	int processorgridcoordX = rank % mpiSizeH;
+	int processorgridcoordY = floor(rank / mpiSizeH);
+
+	int x1=processorgridcoordX    *localgriddimensionX;
+	int x2=(processorgridcoordX+1)*localgriddimensionX-1;
+	int x3=processorgridcoordY    *localgriddimensionY;
+	int x4=(processorgridcoordY+1)*localgriddimensionY-1;
+
+	  char numstr[21];
+	  sprintf (numstr, "%d", step);
+	  std::string filename;
+	  filename.append ("./");
+	  filename.append (output);
+	  filename.append ("/");
+	  filename.append ("sol_");
+	  filename.append (numstr);
+	  filename.append ("_rank");
+	  sprintf (numstr, "%d", rank);
+	  filename.append (numstr);
+	  filename.append (".vts");
+
+	  std::filebuf fb;
+	  fb.open (const_cast < char *>(filename.c_str ()), std::ios::out);
+	  std::ostream os (&fb);
+	  os << "<?xml version=\"1.0\"?>" << std::endl
+	  //  << "<VTKFile type=\"RectilinearGrid\">" << std::endl
+		<< "<VTKFile type=\"StructuredGrid\">" << std::endl
+	    //<< "<RectilinearGrid WholeExtent=\""
+		<< "<StructuredGrid WholeExtent=\""
+	    << "0" << " " << (globalgriddimensionX - 1) << " "
+	    << "0" << " " << (globalgriddimensionY - 1) << " "
+	    << "0" << " " << "0" << " "
+	    << "\" GhostLevel=\"" << "0" << "\">" << std::endl
+	    << "<Piece Extent=\""<<x1<<" "<<x2<<" "<<x3<<" "<<x4<<" 0 0 \">" <<std::endl
+	  //  << "<Coordinates>"<<std::endl
+	    << "<Points>" << std::endl
+	        <<
+	        "<DataArray type=\"Float64\" format=\"ascii\" NumberOfComponents=\"3\"> "
+	        << std::endl;
+	      //coordinates
+	      for (int i = ibegin; i <= iend; ++i)
+	        {
+	          for (int j = jbegin; j <= jend; ++j)
+	    	{
+	    	  os << std::scientific << i * deltaX << " " << j *
+	    	    deltaY << " " << 0.0 << std::endl;
+	    	}
+	        }
+
+	      os << "</DataArray>" << std::endl
+	        << "</Points>" << std::endl
+	        << "<PointData Vectors=\"field\"  Scalars=\"P\">"
+	        << std::endl <<
+	        "<DataArray Name=\"field\" NumberOfComponents=\"3\" type=\"Float64\" >" <<
+	        std::endl;
+	      //velocities
+	      for (int i = ibegin; i <= iend; ++i)
+	        {
+	          RealType x = i * deltaX;
+
+	          for (int j = jbegin; j <= jend; ++j)
+	    	{
+	    	  RealType y = j * deltaY;
+
+	    	  os << std::scientific << interpolateVelocityU (x, y, u,
+	    							 delta) << " " <<
+	    	    interpolateVelocityV (x, y, v, delta) << " " << 0. << std::endl;
+	    	}
+
+	        }
+	      os << "</DataArray>" << std::endl
+	        << "<DataArray type=\"Float64\" Name=\"P\" format=\"ascii\">" <<
+	        std::endl;
+	      //pressure
+	      for (int i = ibegin; i <= iend; ++i)
+	        {
+	          for (int j = jbegin; j <= jend; ++j)
+	    	{
+	    	  os << std::scientific << p[i][j] << " ";
+
+	    	}
+	          os << std::endl;
+
+	        }
+
+	      os << "</DataArray>" << std::endl
+	        << "</PointData>" << std::endl
+	        << "</Piece>" << std::endl
+	        << "</StructuredGrid>" << std::endl << "</VTKFile>" << std::endl;
+	      fb.close ();
+
 }

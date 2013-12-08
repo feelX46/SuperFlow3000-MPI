@@ -94,7 +94,17 @@ int main(int argc, char *argv[]){
 	RealType deltaT = simparam.deltaT;
 	RealType t = 0;
 	int step = 0;
+
+
+	int ibegin = p.beginwrite[0];
+	int iend   = p.endwrite[0];
+	int jbegin = p.beginwrite[1];
+	int jend   = p.endwrite[1];
+	int localgriddimensionX = iend-ibegin+1;
+	int localgriddimensionY = jend-jbegin+1;
+
 	std::cout << "Schritt 1" << std::endl;
+
 	// so gross wie u
 	GridFunction gx(griddimension,simparam.GX,'u');
 
@@ -118,9 +128,12 @@ int main(int argc, char *argv[]){
 
 	//wird hier ein vtk file geschrieben, ohne dass randwerte in matritzen geschrieben wurden?
 
-	if (mpiRank == 3) {
-		Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step);
+	if (mpiRank == 0) {
+			 Reader.writeVTKMasterfile(mpiSizeH, mpiSizeV, step, localgriddimensionX, localgriddimensionY);
 	}
+
+	Reader.writeVTKSlavefile(u, v,  p, h, mpiSizeH, mpiSizeV, step,mpiRank);
+
 	// start time loop
 	Communication communicator(mpiRank, mpiSizeH, mpiSizeV, p.globalboundary);
 	while (t <= simparam.tEnd){
@@ -163,8 +176,12 @@ int main(int argc, char *argv[]){
 		else std::cout << 0;
 		std::cout << std::endl;
 */
-		if ((step%5) == 0 && mpiRank == 3) {
-			Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step);
+		if (0 == (step % 10)) {
+			//Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step);
+			 if (mpiRank == 0) {
+				 Reader.writeVTKMasterfile(mpiSizeH, mpiSizeV, step, localgriddimensionX, localgriddimensionY);
+			 }
+			 Reader.writeVTKSlavefile(u, v,  p, h, mpiSizeH, mpiSizeV, step,mpiRank);
 		}
 
 
