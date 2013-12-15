@@ -28,6 +28,8 @@ void Computation::computeNewVelocities(GridFunction* u, GridFunction* v,
                                 RealType deltaT){
 	//compute u
 	// hier stand vorher bottom left und upper right - nicht mehr aktuell gewesen?!
+	/*std::cout << "beginwrite" << u->beginwrite[0] << " " << u->beginwrite[1] <<std::endl;
+	std::cout << "endwrite" << u->endwrite[0] << " " << u->endwrite[1] <<std::endl;*/
 	MultiIndexType bb (u->beginwrite[0],u->beginwrite[1]);
 	MultiIndexType ee(u->endwrite[0],u->endwrite[1]);
 	u->SetGridFunction(bb,ee,1,f);
@@ -39,7 +41,9 @@ void Computation::computeNewVelocities(GridFunction* u, GridFunction* v,
 
 	//compute v
 	bb[0] = v->beginwrite[0]; bb[1] = v->beginwrite[1];
-	ee[0] = v->endwrite[0]; bb[1] = v->endwrite[1];
+	ee[0] = v->endwrite[0]; ee[1] = v->endwrite[1];
+	/*std::cout << "v beginwrite" << v->beginwrite[0] << " " << v->beginwrite[1] <<std::endl;
+	std::cout << " vendwrite" << v->endwrite[0] << " " << u->endwrite[1] <<std::endl;*/
 	// so wars vorher
 	//ee[0]= u->griddimension[0]-2; ee[1]= u->griddimension[1]-3;
 	v->SetGridFunction(bb,ee,1,g);
@@ -251,6 +255,8 @@ void Computation::setBoundaryF(GridFunction& f, GridFunctionType& u){
 	MultiIndexType ee;
 
 	// left
+
+
 	if(f.globalboundary[2]) {
 		bb[0] = f.beginread[0]; bb[1] = f.beginread[1];
 		ee[0] = f.beginread[0]; ee[1] = f.endread[1];

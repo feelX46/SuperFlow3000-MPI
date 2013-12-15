@@ -39,7 +39,7 @@ public:
    */
   void writeVTKFile (const MultiIndexType& griddimension,
 		     GridFunctionType u, GridFunctionType v,
-		     GridFunctionType p, const PointType& delta, int step);
+		     GridFunctionType p, const PointType& delta, int step, int mpiRank);
 
   // new!!! for MPI
     void writeVTKMasterfile(const IndexType& mpiSizeH, const IndexType& mpiSizeV, int step,

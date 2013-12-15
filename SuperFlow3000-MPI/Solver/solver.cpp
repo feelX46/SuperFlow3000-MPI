@@ -83,12 +83,13 @@ void Solver::SORCycle(GridFunction* gridfunction,
 
 	//Initialization of the residual. Just choose a value, that should be a bad error.
 	RealType res = 10e20;
+	RealType global_res = 10e20;
 	int iterationCounter = 0;
 	// SOR-cycling until error is small enough, or the number of iterations gets to high:
 	RealType neighbours_x, neighbours_y;
 
 	// ToDo Residuum fuer MPI berechnen
-	while (iterationCounter < param.iterMax)// && res > param.eps )
+	while (iterationCounter < param.iterMax && global_res > param.eps )
 	{
 		pc.setBoundaryP(*gridfunction);
 		 for (IndexType i = bwrite[0]; i <= ewrite[0]; i++)
@@ -108,12 +109,13 @@ void Solver::SORCycle(GridFunction* gridfunction,
 		}
 		iterationCounter++;
 		// Hier muessen Druckwerte zwischen Prozessoren ausgetauscht werden!!!
-
 		communicator->ExchangePValues(*gridfunction);
+
 		// ToDo Residuum fuer MPI berechnen
 		res = computeResidual(*gridfunction, rhs, h);
+		MPI_Allreduce ( &res, &global_res, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	}
 	if (iterationCounter >= param.iterMax)
-		std::cout<<"iteration abort with error res = "<<res<<std::endl;
+		std::cout<<"iteration abort with error res = "<< global_res<<std::endl;
 
 }

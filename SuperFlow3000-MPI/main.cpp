@@ -92,6 +92,7 @@ int main(int argc, char *argv[]){
 
 
 	RealType deltaT = simparam.deltaT;
+	RealType local_deltaT = simparam.deltaT;
 	RealType t = 0;
 	int step = 0;
 
@@ -120,13 +121,18 @@ int main(int argc, char *argv[]){
 	//MultiIndexType upperright(griddimension[0]-2,griddimension[1]-1);
 	MultiIndexType offset (0,-1);
 	//evtl. zum testen noetig (einfach durchfliessen)
-	//MultiIndexType linksunten (0,1);
+	MultiIndexType linksunten (0,1);
 	//MultiIndexType linksoben  (0,griddimension[1]-2);
 	//MultiIndexType rechtsunten (griddimension[0]-2,1);
-	//MultiIndexType rechtsoben  (griddimension[0]-2,griddimension[1]-2);
+	MultiIndexType rechtsoben  (griddimension[0]-2,griddimension[1]-2);
 	// write first output data
 
 	//wird hier ein vtk file geschrieben, ohne dass randwerte in matritzen geschrieben wurden?
+
+	//if(mpiRank == 2){
+			//Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step, mpiRank);
+		//}
+	// parallele visualisierung
 
 	if (mpiRank == 0) {
 			 Reader.writeVTKMasterfile(mpiSizeH, mpiSizeV, step, localgriddimensionX, localgriddimensionY);
@@ -138,19 +144,21 @@ int main(int argc, char *argv[]){
 	Communication communicator(mpiRank, mpiSizeH, mpiSizeV, p.globalboundary);
 	while (t <= simparam.tEnd){
 		// compute deltaT
-		deltaT = 0.005;
-		//deltaT = pc.computeTimestep(u.MaxValueGridFunction(bb,ee),v.MaxValueGridFunction(bb,ee),h);
+		//deltaT = 0.005;
+		local_deltaT = pc.computeTimestep(u.MaxValueGridFunction(u.beginwrite,u.endwrite),v.MaxValueGridFunction(v.beginwrite,v.endwrite),h);
+		MPI_Allreduce ( &local_deltaT, &deltaT, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
 		// set boundary
 		pc.setBoundaryU(u); //First implementation: only no-flow boundaries-> everything is zero!
 		pc.setBoundaryV(v);
-		// driven cavity:
 
+		// driven cavity:
 		if (u.globalboundary[2]){
 			//MultiIndexType UpperLeft(1,u.griddimension[1]-1);
 			MultiIndexType UpperLeft(0,u.griddimension[1]-1);
 			MultiIndexType UpperRight(u.griddimension[0]-2, u.griddimension[1]-1);
 			u.SetGridFunction(UpperLeft,UpperRight,-1.0,offset,2.0);
 		}
+
 		//Testrandwerte
 		/*if (mpiRank==2){
 			MultiIndexType LowerLeft(u.beginwrite[0],u.beginwrite[1]);
@@ -176,6 +184,14 @@ int main(int argc, char *argv[]){
 		else std::cout << 0;
 		std::cout << std::endl;
 */
+
+		if((step%10) == 0){
+
+			Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step, mpiRank);
+		}
+
+		// parallel visualisierung
+
 		if (0 == (step % 10)) {
 			//Reader.writeVTKFile(griddimension,u.GetGridFunction(),v.GetGridFunction(), p.GetGridFunction(), h, step);
 			 if (mpiRank == 0) {
@@ -185,18 +201,29 @@ int main(int argc, char *argv[]){
 		}
 
 
+
+
 	    // compute f / g
 		GridFunctionType blgx = gx.GetGridFunction(); //ToDo: schoener machen!
 		GridFunctionType blgy = gy.GetGridFunction();
 		GridFunctionType blu  = u.GetGridFunction();
 		GridFunctionType blv  = v.GetGridFunction();
+
+
 		pc.computeMomentumEquations(&f,&g,&u,&v,blgx,blgy,h,deltaT);
+
 		pc.setBoundaryF(f,blu);
 		pc.setBoundaryG(g,blv);
+
+
+
 		// set right side of pressure equation
 		GridFunctionType blf = f.GetGridFunction();
 		GridFunctionType blg = g.GetGridFunction();
 		pc.computeRighthandSide(&rhs, blf, blg,h,deltaT);
+
+
+
 
 		// solver
 		//ToDo enventuell muss die iterationschleife hier rein!
@@ -235,6 +262,7 @@ int main(int argc, char *argv[]){
 		}
 		//Update velocity
 		GridFunctionType blp = p.GetGridFunction();
+
 		pc.computeNewVelocities(&u, &v,blf,blg,blp,h,deltaT);
 
 		if (plot == true) {
@@ -268,10 +296,10 @@ int main(int argc, char *argv[]){
 
 		}
 
-
-
 		communicator.ExchangePValues(u);
 		communicator.ExchangePValues(v);
+
+
 
 		if (plot == true) {
 		MPI_Barrier(MPI_COMM_WORLD);
@@ -309,41 +337,9 @@ int main(int argc, char *argv[]){
 		t += deltaT;
 		step++;
 
-
 		// write files
 		std::cout<< step<<"  -  "<<t<<" / " <<simparam.tEnd<<std::endl;
 	}
-
-
-
-/*
-	if (mpiRank == 0) {
-		p.SetGridFunction(p.beginread,p.endread,1);
-		// hier passiert ein fehler fuer prozessorenzahlen ab 6 !!??
-		p.PlotGrid();
-	}
-	MPI_Barrier(MPI_COMM_WORLD);
-	if (mpiRank == 2) {
-		p.SetGridFunction(p.beginread,p.endread,2);
-		std::cout << "Rank 1----------------------------------------------" << std::endl;
-		p.PlotGrid();
-		std::cout << "Rank 1----------------------------------------------" << std::endl;
-	}
-	MPI_Barrier(MPI_COMM_WORLD);
-
-
-
-
-	if (mpiRank == 0) {
-		p.PlotGrid();
-	}
-	MPI_Barrier(MPI_COMM_WORLD);
-	if (mpiRank == 2) {
-			std::cout << "Rank 1----------------------------------------------" << std::endl;
-			p.PlotGrid();
-			std::cout << "Rank 1----------------------------------------------" << std::endl;
-		}
-	MPI_Barrier(MPI_COMM_WORLD);*/
 	MPI_Finalize();
 	return 0;
 }

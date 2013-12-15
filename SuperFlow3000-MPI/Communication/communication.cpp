@@ -35,6 +35,8 @@ Communication::Communication(int rank, int mpiSizeH, int mpiSizeV, bool *globalb
 
 
 	// wegen fehlermeldungen bei ausfuehrung mit 6 prozessoren jetzt erstmal hart auf 4 prozessoren geschrieben
+	// fuer 4
+
 	if(rank == 0) {red = true;}
 	if(rank == 1) {red = false;}
 	if(rank == 2) {red = false;}

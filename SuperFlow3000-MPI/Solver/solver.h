@@ -13,6 +13,7 @@
 #include"../Grid/gridfunction.h"
 #include "../IO/IO.hpp"
 #include "../Communication/communication.h"
+#include "mpi.h"
 /*! @class Class Solver runs the Successive-Over-Relaxation-Cycle
  *
  */

@@ -191,7 +191,7 @@ RealType
 void
 IO::writeVTKFile (const MultiIndexType& griddimension, GridFunctionType u,
 		  GridFunctionType v, GridFunctionType p,
-		  const PointType& delta, int step)
+		  const PointType& delta, int step, int mpiRank)
 {
   RealType deltaX = delta[0];
   RealType deltaY = delta[1];
@@ -201,13 +201,18 @@ IO::writeVTKFile (const MultiIndexType& griddimension, GridFunctionType u,
 
   char numstr[21];
   sprintf (numstr, "%d", step);
+  char rank[21];
+  sprintf(rank, "%d", mpiRank);
   std::string filename;
   filename.append ("./");
   filename.append (output);
   filename.append ("/");
+  filename.append (rank);
+  filename.append ("/");
   filename.append ("field_");
   filename.append (numstr);
   filename.append (".vts");
+  std::cout << filename << std::endl;
   std::filebuf fb;
   fb.open (const_cast < char *>(filename.c_str ()), std::ios::out);
   std::ostream os (&fb);
@@ -295,38 +300,41 @@ void IO::writeVTKMasterfile(const IndexType& mpiSizeH, const IndexType& mpiSizeV
 	  filename.append ("/");
 	  filename.append ("sol_");
 	  filename.append (numstr);
-	  filename.append ("_master.pvts");
+	  filename.append ("_master.pvtr");
 
 	  std::filebuf fb; // ?
 	  fb.open (const_cast < char *>(filename.c_str ()), std::ios::out);
 	  std::ostream os (&fb);
 	  os << "<?xml version=\"1.0\"?>" << std::endl
-	    << "<VTKFile type=\"PStructuredGrid\">" << std::endl
-	    << "<PStructuredGrid WholeExtent=\""
-	    << "0" << " " << (globalgriddimensionX - 1) << " "
-	    << "0" << " " << (globalgriddimensionY - 1) << " "
+	    << "<VTKFile type=\"PRectilinearGrid\">" << std::endl
+	    << "<PRectilinearGrid WholeExtent=\""
+	    << "0" << " " << (globalgriddimensionX - 2) << " "
+	    << "0" << " " << (globalgriddimensionY - 2) << " "
 	    << "0" << " " << "0" << " "
-	    << "\" GhostLevel=\"" << "0" << "\">" << std::endl;
-	  os <<"<PPoints>"<<std::endl;
-	  os <<"<PDataArray type=\"Float64\" format=\"ascii\" NumberOfComponents=\"3\"/>"  <<std::endl;
-	  os <<"</PPoints>"<<std::endl;
+	    << "\" GhostLevel=\"" << "1" << "\">" << std::endl;
+	  os <<"<PCoordinates>"<<std::endl;
+	  os <<"<PDataArray type=\"Float64\"/>" << std::endl;
+	  os <<"<PDataArray type=\"Float64\"/>" << std::endl;
+	  os <<"<PDataArray type=\"Float64\"/>" << std::endl;
+	  os <<"</PCoordinates>"<<std::endl;
 	  for(int rank=0; rank<nprocessor; rank++){
-		    processorgridcoordX = rank % mpiSizeH;
-		    processorgridcoordY = floor(rank / mpiSizeH);
-			x1=processorgridcoordX    *localgriddimensionX;
-			x2=(processorgridcoordX+1)*localgriddimensionX-1;
-			x3=processorgridcoordY    *localgriddimensionY;
-			x4=(processorgridcoordY+1)*localgriddimensionY-1;
+			processorgridcoordX = rank % mpiSizeH;
+			processorgridcoordY = floor(rank / mpiSizeH);
+			x1=processorgridcoordX    *localgriddimensionX-processorgridcoordX;
+			x2=(processorgridcoordX+1)*localgriddimensionX-processorgridcoordX-1;
+			x3=processorgridcoordY    *localgriddimensionY-processorgridcoordY;
+			x4=(processorgridcoordY+1)*localgriddimensionY-processorgridcoordY-1;
+
 
 		  os << "<Piece Extent=\""<<x1<<" "<<x2<<" "<<x3<<" "<<x4<<" 0 0 "
-			<<"\" Source=\"sol_"<<numstr<<"_rank"<<rank<<".vts\"/>"<<std::endl;
+			<<"\" Source=\"sol_"<<numstr<<"_rank"<<rank<<".vtr\"/>"<<std::endl;
 	  }
 
-	  os <<"<PPointData Vectors=\"field\"  Scalars=\"P\">"<<std::endl;
+	  os <<"<PPointData>"<<std::endl;
 	  os <<"<PDataArray Name=\"field\" NumberOfComponents=\"3\" type=\"Float64\" />"  <<std::endl;
 	  os <<"<PDataArray type=\"Float64\" Name=\"p\"/>"<<std::endl
 	    <<"</PPointData>"<<std::endl
-        << "</PStructuredGrid>" << std::endl
+        << "</PRectilinearGrid>" << std::endl
 	    <<"</VTKFile>"<< std::endl;
 	  fb.close ();
 }
@@ -354,10 +362,10 @@ void IO::writeVTKSlavefile(GridFunction& u_gridfunction,
 	int processorgridcoordX = rank % mpiSizeH;
 	int processorgridcoordY = floor(rank / mpiSizeH);
 
-	int x1=processorgridcoordX    *localgriddimensionX;
-	int x2=(processorgridcoordX+1)*localgriddimensionX-1;
-	int x3=processorgridcoordY    *localgriddimensionY;
-	int x4=(processorgridcoordY+1)*localgriddimensionY-1;
+	int x1=processorgridcoordX    *localgriddimensionX-processorgridcoordX;
+	int x2=(processorgridcoordX+1)*localgriddimensionX-processorgridcoordX-1;
+	int x3=processorgridcoordY    *localgriddimensionY-processorgridcoordY;
+	int x4=(processorgridcoordY+1)*localgriddimensionY-processorgridcoordY-1;
 
 	  char numstr[21];
 	  sprintf (numstr, "%d", step);
@@ -370,50 +378,57 @@ void IO::writeVTKSlavefile(GridFunction& u_gridfunction,
 	  filename.append ("_rank");
 	  sprintf (numstr, "%d", rank);
 	  filename.append (numstr);
-	  filename.append (".vts");
+	  filename.append (".vtr");
 
 	  std::filebuf fb;
 	  fb.open (const_cast < char *>(filename.c_str ()), std::ios::out);
 	  std::ostream os (&fb);
 	  os << "<?xml version=\"1.0\"?>" << std::endl
 	  //  << "<VTKFile type=\"RectilinearGrid\">" << std::endl
-		<< "<VTKFile type=\"StructuredGrid\">" << std::endl
-	    //<< "<RectilinearGrid WholeExtent=\""
-		<< "<StructuredGrid WholeExtent=\""
-	    << "0" << " " << (globalgriddimensionX - 1) << " "
-	    << "0" << " " << (globalgriddimensionY - 1) << " "
+		<< "<VTKFile type=\"RectilinearGrid\">" << std::endl
+	    << "<RectilinearGrid WholeExtent=\""
+	    << x1 << " " << x2 << " "
+	    << x3 << " " << x4 << " "
 	    << "0" << " " << "0" << " "
 	    << "\" GhostLevel=\"" << "0" << "\">" << std::endl
 	    << "<Piece Extent=\""<<x1<<" "<<x2<<" "<<x3<<" "<<x4<<" 0 0 \">" <<std::endl
-	  //  << "<Coordinates>"<<std::endl
-	    << "<Points>" << std::endl
+	    << "<Coordinates>"<<std::endl
 	        <<
-	        "<DataArray type=\"Float64\" format=\"ascii\" NumberOfComponents=\"3\"> "
+	        "<DataArray type=\"Float64\" format=\"ascii\"> "
 	        << std::endl;
 	      //coordinates
 	      for (int i = ibegin; i <= iend; ++i)
-	        {
-	          for (int j = jbegin; j <= jend; ++j)
-	    	{
-	    	  os << std::scientific << i * deltaX << " " << j *
-	    	    deltaY << " " << 0.0 << std::endl;
-	    	}
-	        }
-
+	      {
+	    	  os << std::scientific <<(processorgridcoordX*localgriddimensionX)*deltaX-processorgridcoordX*deltaX+ i * deltaX << " ";
+	      }
+	      os << std::endl;
 	      os << "</DataArray>" << std::endl
-	        << "</Points>" << std::endl
-	        << "<PointData Vectors=\"field\"  Scalars=\"P\">"
+	      << "<DataArray type=\"Float64\" format=\"ascii\"> " << std::endl;
+	      for (int j = jbegin; j <= jend; ++j)
+	      {
+	    	  os << std::scientific << (processorgridcoordY*localgriddimensionY)*deltaY-processorgridcoordY*deltaY + j * deltaY << " ";
+	      }
+	      os << std::endl
+	      << "</DataArray>" << std::endl
+	      << "<DataArray type=\"Float64\" format=\"ascii\"> " << std::endl
+	      << "0 0" << std::endl
+	      << "</DataArray>" << std::endl
+
+	        << "</Coordinates>" << std::endl
+	        << "<PointData>"
 	        << std::endl <<
 	        "<DataArray Name=\"field\" NumberOfComponents=\"3\" type=\"Float64\" >" <<
 	        std::endl;
 	      //velocities
+	      for (int j = jbegin; j <= jend; ++j)
+	      	    	{
+	      	    	  RealType y = j * deltaY;
+
 	      for (int i = ibegin; i <= iend; ++i)
 	        {
 	          RealType x = i * deltaX;
 
-	          for (int j = jbegin; j <= jend; ++j)
-	    	{
-	    	  RealType y = j * deltaY;
+
 
 	    	  os << std::scientific << interpolateVelocityU (x, y, u,
 	    							 delta) << " " <<
@@ -425,10 +440,10 @@ void IO::writeVTKSlavefile(GridFunction& u_gridfunction,
 	        << "<DataArray type=\"Float64\" Name=\"P\" format=\"ascii\">" <<
 	        std::endl;
 	      //pressure
-	      for (int i = ibegin; i <= iend; ++i)
-	        {
-	          for (int j = jbegin; j <= jend; ++j)
-	    	{
+          for (int j = jbegin; j <= jend; ++j)
+          {
+        	  for (int i = ibegin; i <= iend; ++i)
+        	  {
 	    	  os << std::scientific << p[i][j] << " ";
 
 	    	}
@@ -439,7 +454,7 @@ void IO::writeVTKSlavefile(GridFunction& u_gridfunction,
 	      os << "</DataArray>" << std::endl
 	        << "</PointData>" << std::endl
 	        << "</Piece>" << std::endl
-	        << "</StructuredGrid>" << std::endl << "</VTKFile>" << std::endl;
+	        << "</RectilinearGrid>" << std::endl << "</VTKFile>" << std::endl;
 	      fb.close ();
 
 }
